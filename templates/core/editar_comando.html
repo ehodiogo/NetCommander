@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Editar Comando: {{ comando.nome }}</h4>
+                    <i class="bi bi-terminal"></i>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nome do Comando</label>
+                            {{ form.nome }}
+                            <div class="form-text">Ex: Atualizar Sistema, Desligar PCs...</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-info">Script Linux (SSH)</label>
+                                {{ form.comando_linux }}
+                                <small class="text-muted font-monospace">Rodará como ncc@ip</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-primary">Script Windows (PsExec)</label>
+                                {{ form.comando_windows }}
+                                <small class="text-muted font-monospace">Rodará via CMD</small>
+                            </div>
+                        </div>
+
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-5">Salvar Alterações</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3 small shadow-sm">
+                <i class="bi bi-info-circle-fill me-2"></i>
+                <strong>Dica:</strong> Lembre-se que o comando será executado com as credenciais configuradas no seu arquivo <code>.env</code>.
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-dark text-white py-3 text-center">
+                    <h4 class="mb-0"><i class="bi bi-door-open-fill me-2"></i>Nova Sala de TI</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <p class="text-muted">As salas permitem agrupar máquinas para execuções em massa via <strong>ncc@ip</strong>.</p>
+                    </div>
+
+                    <form method="POST">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-secondary">Nome da Sala / Laboratório</label>
+                            {{ form.nome }}
+                            <div class="form-text mt-2">
+                                <i class="bi bi-info-circle"></i> Use nomes claros como "Laboratório 01" ou "Setor Financeiro".
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg shadow">
+                                <i class="bi bi-arrow-right-circle me-2"></i>Salvar e Adicionar Máquinas
+                            </button>
+                            <a href="{% url 'home' %}" class="btn btn-link text-secondary mt-2">
+                                Cancelar e Voltar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="text-center mt-4 text-muted small">
+                <i class="bi bi-lightbulb"></i> Após salvar, você será levado ao gerenciador da sala.
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilização para o campo de input via Django form */
+    #id_nome {
+        display: block;
+        width: 100%;
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        background-clip: padding-box;
+        border: 2px solid #dee2e6;
+        border-radius: 0.5rem;
+        transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+    }
+    #id_nome:focus {
+        border-color: #0d6efd;
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+</style>
+{% endblock %}

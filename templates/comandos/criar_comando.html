@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow border-0">
+                <div class="card-header bg-dark text-white py-3">
+                    <h4 class="mb-0"><i class="bi bi-terminal me-2"></i>Configurar Comando</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" id="comandoForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Nome do Comando:</label>
+                            {{ form.nome }}
+                            <div class="form-text">Ex: "Atualizar Sistema" ou "Desligar Máquina"</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Alvo do Comando:</label>
+                            <select id="tipo_alvo" class="form-select shadow-sm border-primary">
+                                <option value="ambos">Ambos (Dual Boot / Híbrido)</option>
+                                <option value="linux">Apenas Linux (Debian)</option>
+                                <option value="windows">Apenas Windows</option>
+                            </select>
+                        </div>
+
+                        <hr>
+
+                        <div class="mb-4" id="div_linux">
+                            <label class="form-label fw-bold text-success">
+                                <i class="bi bi-ubuntu"></i> Comando Linux (SSH)
+                            </label>
+                            {{ form.comando_linux }}
+                            <small class="text-muted d-block mt-1">Executado como <code>ncc@ip</code></small>
+                        </div>
+
+                        <div class="mb-4" id="div_windows">
+                            <label class="form-label fw-bold text-primary">
+                                <i class="bi bi-windows"></i> Comando Windows (PsExec)
+                            </label>
+                            {{ form.comando_windows }}
+                            <small class="text-muted d-block mt-1">Executado via CMD remoto</small>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-5">
+                            <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                            <button type="submit" class="btn btn-primary px-5 fw-bold shadow">
+                                <i class="bi bi-check-lg"></i> Salvar Comando
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Lógica para mostrar/esconder campos baseado no select
+    const selectAlvo = document.getElementById('tipo_alvo');
+    const divLinux = document.getElementById('div_linux');
+    const divWindows = document.getElementById('div_windows');
+
+    function atualizarCampos() {
+        const valor = selectAlvo.value;
+        
+        divLinux.style.display = (valor === 'linux' || valor === 'ambos') ? 'block' : 'none';
+        divWindows.style.display = (valor === 'windows' || valor === 'ambos') ? 'block' : 'none';
+    }
+
+    selectAlvo.addEventListener('change', atualizarCampos);
+    
+    // Executa ao carregar a página para o caso de edição
+    window.onload = atualizarCampos;
+</script>
+{% endblock %}

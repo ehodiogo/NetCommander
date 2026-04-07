@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
+            <li class="breadcrumb-item active">{{ sala.nome }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Gerenciar Sala: <span class="text-primary">{{ sala.nome }}</span></h2>
+            <p class="text-muted mb-0">{{ sala.maquinas.count }} máquinas vinculadas a este setor.</p>
+        </div>
+        <a href="{% url 'criar_maquina_sala' sala.id %}" class="btn btn-success shadow-sm px-4">
+            <i class="bi bi-plus-circle-fill me-2"></i>Nova Máquina
+        </a>
+    </div>
+    
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Inventário de Máquinas</h5>
+            <span class="badge bg-primary">{{ sala.nome }}</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Nome da Máquina</th>
+                            <th>MAC Address</th>
+                            <th>Último IP Conhecido</th>
+                            <th>S.O. Instalado</th>
+                            <th class="text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for maquina in sala.maquinas.all %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle bg-light p-2 me-3">
+                                        <i class="bi bi-display text-secondary"></i>
+                                    </div>
+                                    <span class="fw-bold">{{ maquina.nome }}</span>
+                                </div>
+                            </td>
+                            <td><code class="user-select-all text-dark">{{ maquina.mac_address }}</code></td>
+                            <td>
+                                {% if maquina.ultimo_ip %}
+                                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-3 py-2">
+                                        <i class="bi bi-ethernet me-1"></i> {{ maquina.ultimo_ip }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small italic">Não definido</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if maquina.tipo_os == 'debian' %}
+                                        <i class="bi bi-ubuntu text-danger me-2 fs-5"></i>
+                                    {% elif maquina.tipo_os == 'windows' %}
+                                        <i class="bi bi-windows text-primary me-2 fs-5"></i>
+                                    {% else %}
+                                        <i class="bi bi-intersect text-warning me-2 fs-5"></i>
+                                    {% endif %}
+                                    {{ maquina.get_tipo_os_display }}
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <a href="{% url 'editar_maquina' sala.id maquina.id %}" class="btn btn-sm btn-warning shadow-sm px-3">
+                                    <i class="bi bi-pencil-square me-1"></i> Editar / Fixar IP
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5">
+                                <i class="bi bi-search fs-1 text-muted d-block mb-3"></i>
+                                <p class="text-muted">Nenhuma máquina cadastrada nesta sala.</p>
+                                <a href="{% url 'criar_maquina_sala' sala.id %}" class="btn btn-sm btn-primary">Cadastrar agora</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4 pb-5">
+        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Voltar ao Dashboard
+        </a>
+    </div>
+</div>
+
+<style>
+    /* Estilo para facilitar a cópia do MAC se necessário */
+    code {
+        background-color: #f8f9fa;
+        padding: 2px 5px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.03);
+    }
+</style>
+{% endblock %}
