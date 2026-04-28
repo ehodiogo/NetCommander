@@ -1,3 +1,4 @@
+import cmd
 import threading
 import subprocess
 import os
@@ -19,9 +20,23 @@ def executar_linux(ip, comando):
     return subprocess.getoutput(cmd)
 
 def executar_windows(ip, comando):
-    # Se precisar de senha dinâmica aqui também, podemos ajustar
-    cmd = f"psexec \\\\{ip} -u ncc -p {NCC_PASSWORD} cmd /c \"{comando}\""
-    return subprocess.getoutput(cmd)
+    cmd = [
+        "sshpass", "-p", NCC_PASSWORD,
+        "ssh",
+        "-o", "ConnectTimeout=3",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "PreferredAuthentications=password",
+        "-o", "PubkeyAuthentication=no",
+        f"ncc@{ip}",
+        comando
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding='cp1252', errors='replace')  
+    
+    if result.returncode == 0:
+        return result.stdout
+    else:
+        return result.stderr
 
 def detectar_os(ip):
     # Também precisa de sshpass para não travar na detecção
