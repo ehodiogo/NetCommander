@@ -100,3 +100,15 @@ def editar_comando(request, comando_id):
         'form': form,
         'comando': comando
     })
+
+def remover_maquina(request, sala_id, maquina_id):
+    sala = get_object_or_404(Sala, id=sala_id)
+    maquina = get_object_or_404(Maquina, id=maquina_id)
+
+    # Apenas POST realiza a remoção para evitar ações acidentais via GET
+    if request.method == 'POST':
+        sala.maquinas.remove(maquina)
+        return redirect('sala_detail', sala_id=sala.id)
+
+    # Caso cheguem por GET, redirecionamos de volta à página da sala
+    return redirect('sala_detail', sala_id=sala.id)

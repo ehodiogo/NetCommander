@@ -70,9 +70,16 @@
                                 </div>
                             </td>
                             <td class="text-center">
-                                <a href="{% url 'editar_maquina' sala.id maquina.id %}" class="btn btn-sm btn-warning shadow-sm px-3">
+                                <a href="{% url 'editar_maquina' sala.id maquina.id %}" class="btn btn-sm btn-warning shadow-sm px-3 me-2">
                                     <i class="bi bi-pencil-square me-1"></i> Editar / Fixar IP
                                 </a>
+
+                                <form method="post" action="{% url 'remover_maquina' sala.id maquina.id %}" style="display:inline-block;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remover {{ maquina.nome }} desta sala?');">
+                                        <i class="bi bi-trash me-1"></i> Remover
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% empty %}

@@ -1,10 +1,63 @@
-import cmd
+import ipaddress
+import platform
+import socket
 import threading
 import subprocess
 import os
+import time
 from decouple import config
 
 NCC_PASSWORD = config('NCC_ADMIN_PASSWORD', default='senha_padrao')
+
+
+def _ping_responde(ip):
+    sistema = platform.system().lower()
+
+    if sistema == "windows":
+        comando = ["ping", "-n", "1", "-w", "1000", ip]
+    else:
+        comando = ["ping", "-c", "1", "-W", "1", ip]
+
+    resultado = subprocess.run(comando, capture_output=True, text=True)
+    return resultado.returncode == 0
+
+
+def _broadcast_para_ip(ip):
+    try:
+        rede = ipaddress.ip_network(f"{ip}/24", strict=False)
+        return str(rede.broadcast_address)
+    except ValueError:
+        return "255.255.255.255"
+
+
+def enviar_wol(mac, ip=None, porta=9):
+    mac_limpo = mac.replace("-", ":").replace(".", "").lower().replace(":", "")
+    pacote = bytes.fromhex("ff" * 6 + mac_limpo * 16)
+    destino = _broadcast_para_ip(ip) if ip else "255.255.255.255"
+
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(pacote, (destino, porta))
+
+
+def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5):
+    """Tenta ping; se não responder envia WOL e espera.
+
+    Retorna tupla (online: bool, mensagem: str|None, wol_enviado: bool).
+    """
+    # Se já responde ao ping, não enviamos WOL
+    if _ping_responde(ip):
+        return True, None, False
+
+    # Não respondeu: envia WOL e aguarda
+    enviar_wol(mac, ip)
+
+    for _ in range(tentativas):
+        time.sleep(intervalo)
+        if _ping_responde(ip):
+            return True, None, True
+
+    return False, f"Máquina não respondeu ao ping após Wake on LAN em {tentativas * intervalo}s.", True
 
 def executar_linux(ip, comando):
     """
@@ -73,10 +126,26 @@ def worker(maquina, comando, arp_table, resultados, lock):
             })
         return
 
+    online, mensagem, wol_enviado = garantir_maquina_ligada(ip, mac_banco)
+    if not online:
+        with lock:
+            resultados.append({
+                "maquina": maquina.nome,
+                "ip": ip,
+                "os": "N/A",
+                "status": "offline",
+                "output": mensagem,
+            })
+        return
+
     # 3. Lógica de detecção de OS (se dual boot)
     os_execucao = maquina.tipo_os
     if maquina.tipo_os == "dual":
-        os_execucao = detectar_os(ip)
+        # Se tiver sido necessário enviar WOL (estava desligado), preferir executar no Linux
+        if wol_enviado:
+            os_execucao = "debian"
+        else:
+            os_execucao = detectar_os(ip)
 
     try:
         if os_execucao == "debian":
