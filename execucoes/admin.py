@@ -1,3 +1,5 @@
 from django.contrib import admin
+from .models import Comando, Execucao
 
-# Register your models here.
+admin.site.register(Comando)
+admin.site.register(Execucao)
