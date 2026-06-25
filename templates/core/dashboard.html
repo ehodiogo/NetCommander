@@ -65,10 +65,20 @@
             <div class="row g-4">
                 <div class="col-md-5">
                     <label class="form-label fw-bold text-muted small text-uppercase">Onde executar?</label>
-                    <select id="sala" class="form-select form-select-lg custom-select">
+
+                    <div class="btn-group btn-group-sm mb-2 w-100" role="group">
+                        <button type="button" class="btn btn-outline-dark active" id="btn-modo-sala" onclick="setModo('sala')">Por Sala</button>
+                        <button type="button" class="btn btn-outline-dark" id="btn-modo-maquina" onclick="setModo('maquina')">Por Máquina</button>
+                    </div>
+
+                    <select id="sala" class="form-select form-select-lg custom-select mb-2" onchange="atualizarMaquinasDaSala()">
                         {% for s in salas %}
                             <option value="{{ s.id }}">{{ s.nome }} ({{ s.maquinas.count }} PCs)</option>
                         {% endfor %}
+                    </select>
+
+                    <select id="maquina" class="form-select form-select-lg custom-select d-none">
+                        <!-- preenchido via JS -->
                     </select>
                 </div>
                 <div class="col-md-5">
@@ -169,32 +179,79 @@
 
 <script>
 // Mantive sua lógica de JS, mas adicionei a estilização dos resultados dinâmicos
-function executar() {
+// Atualização para poder escolher um computador específico ao invés de uma sala inteira
+
+let modoAtual = "sala";
+
+const salasMaquinas = {
+    {% for s in salas %}
+        "{{ s.id }}": [
+            {% for m in s.maquinas.all %}
+                { id: {{ m.id }}, nome: "{{ m.nome|escapejs }}", tipo_os: "{{ m.get_tipo_os_display|escapejs }}" }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+function atualizarMaquinasDaSala() {
     const salaId = document.getElementById("sala").value;
+    const maquinaSelect = document.getElementById("maquina");
+    const maquinas = salasMaquinas[salaId] || [];
+    maquinaSelect.innerHTML = "";
+    if (maquinas.length === 0) {
+        maquinaSelect.innerHTML = `<option value="">Nenhuma máquina nesta sala</option>`;
+        return;
+    }
+    maquinas.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m.id;
+        opt.textContent = `${m.nome} (${m.tipo_os})`;
+        maquinaSelect.appendChild(opt);
+    });
+}
+
+function setModo(modo) {
+    modoAtual = modo;
+    document.getElementById("btn-modo-sala").classList.toggle("active", modo === "sala");
+    document.getElementById("btn-modo-maquina").classList.toggle("active", modo === "maquina");
+
+    document.getElementById("sala").classList.remove("d-none");
+
+    document.getElementById("maquina").classList.toggle("d-none", modo !== "maquina");
+
+    if (modo === "maquina") {
+        atualizarMaquinasDaSala();
+    }
+}
+
+function executar() {
     const comandoId = document.getElementById("comando").value;
     const areaResultados = document.getElementById("area-resultados");
     const tabelaBody = document.querySelector("#tabela tbody");
-
-    if(!salaId || !comandoId) return alert("Selecione sala e comando!");
-
+    let url;
+    if (modoAtual === "sala") {
+        const salaId = document.getElementById("sala").value;
+        if (!salaId || !comandoId) return alert("Selecione sala e comando!");
+        url = `/api/executar/${salaId}/${comandoId}/`;
+    } else {
+        const maquinaId = document.getElementById("maquina").value;
+        if (!maquinaId || !comandoId) return alert("Selecione a máquina e o comando!");
+        url = `/api/executar_maquina/${maquinaId}/${comandoId}/`;
+    }
     areaResultados.classList.remove("d-none");
     tabelaBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-grow text-primary"></div><p class="mt-2 text-muted">Aguardando resposta das máquinas...</p></td></tr>`;
-
-    fetch(`/api/executar/${salaId}/${comandoId}/`)
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             tabelaBody.innerHTML = "";
             data.resultados.forEach(r => {
                 let row = document.createElement("tr");
                 row.className = "border-bottom";
-                
                 let corStatus = "bg-secondary";
                 if (r.status === "sucesso") corStatus = "bg-success";
                 if (r.status === "erro") corStatus = "bg-danger";
                 if (r.status === "offline") corStatus = "bg-warning text-dark";
-
                 let osIcon = r.os === "debian" ? '<i class="bi bi-ubuntu text-danger"></i>' : '<i class="bi bi-windows text-info"></i>';
-
                 row.innerHTML = `
                     <td class="ps-3"><span class="fw-bold text-dark">${r.maquina}</span></td>
                     <td><code class="text-primary">${r.ip || '--'}</code></td>

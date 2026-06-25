@@ -13,4 +13,5 @@ urlpatterns = [
     path('salas/<int:sala_id>/nova-maquina/', views.criar_maquina, name='criar_maquina_sala'),
     path('comando/editar/<int:comando_id>/', views.editar_comando, name='editar_comando'),
     path('comandos/novo/', views.criar_comando, name='criar_comando'),
+    path('api/executar_maquina/<int:maquina_id>/<int:comando_id>/', views.executar_maquina, name='executar_maquina'),
 ]

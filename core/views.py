@@ -112,3 +112,20 @@ def remover_maquina(request, sala_id, maquina_id):
 
     # Caso cheguem por GET, redirecionamos de volta à página da sala
     return redirect('sala_detail', sala_id=sala.id)
+
+
+# Atualização para poder escolher um computador específico ao invés de uma sala inteira
+def executar_maquina(request, maquina_id, comando_id):
+
+    maquina = get_object_or_404(Maquina, id=maquina_id)
+    comando = Comando.objects.get(id=comando_id)
+
+    arp_table = scan_arp()
+
+    resultados = executar_em_paralelo(
+        Maquina.objects.filter(id=maquina.id),
+        comando,
+        arp_table
+    )
+
+    return JsonResponse({"resultados": resultados})
