@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,20 +14,20 @@
 
     <style>
         :root {
-            --brand-color: #764ba2;
-            --dark-bg: #1a1d20;
+            --brand-color: #2563eb;
+            --dark-bg: #161b22;
         }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8f9fa;
-            color: #334155;
+            background-color: #0d1117;
+            color: #e1e7ef;
         }
 
         .navbar-brand {
             font-weight: 700;
             letter-spacing: -0.5px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -37,7 +37,6 @@
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* Estilo para códigos e terminais em todo o sistema */
         code, pre {
             font-family: 'JetBrains Mono', monospace !important;
         }
@@ -45,11 +44,10 @@
         .footer {
             margin-top: 5rem;
             padding: 2rem 0;
-            border-top: 1px solid #e2e8f0;
-            color: #94a3b8;
+            border-top: 1px solid #2d333b;
+            color: #8b949e;
         }
 
-        /* Ajuste fino para botões arredondados */
         .btn { border-radius: 8px; }
     </style>
 </head>
@@ -88,7 +86,7 @@
         {% endblock %}
     </main>
 
-    <footer class="footer bg-white mt-auto">
+    <footer class="footer bg-transparent mt-auto">
         <div class="container text-center">
             <p class="mb-0 small">
                 <strong>NetCommander NCC</strong> &copy; 2026 | 
