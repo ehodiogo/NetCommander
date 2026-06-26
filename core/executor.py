@@ -107,17 +107,32 @@ def enviar_wol(mac, ip=None, porta=9):
         mac, ip or "N/A", broadcasts
     )
 
+    portas = [porta]
+    if porta != 7:
+        portas.append(7)
+
     enviado = False
     for destino in broadcasts:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                sock.settimeout(2)
-                sock.sendto(pacote, (destino, porta))
-                logger.debug("Pacote WoL enviado para broadcast %s:%s", destino, porta)
-                enviado = True
-        except Exception as e:
-            logger.warning("Falha ao enviar WoL para broadcast %s: %s", destino, e)
+        for p in portas:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+                    sock.settimeout(2)
+                    sock.bind(('0.0.0.0', 0))
+                    for tentativa in range(3):
+                        sock.sendto(pacote, (destino, p))
+                        logger.debug(
+                            "Pacote WoL enviado para broadcast %s:%s "
+                            "(tentativa %d/3)", destino, p, tentativa + 1
+                        )
+                        enviado = True
+                        if tentativa < 2:
+                            time.sleep(0.1)
+            except Exception as e:
+                logger.warning(
+                    "Falha ao enviar WoL para broadcast %s:%s: %s",
+                    destino, p, e
+                )
 
     if not enviado:
         logger.error("Nenhum broadcast funcionou para WoL MAC %s", mac)
