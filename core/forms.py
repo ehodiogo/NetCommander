@@ -1,4 +1,6 @@
+import re
 from django import forms
+from django.core.exceptions import ValidationError
 from maquinas.models import Maquina
 from salas.models import Sala
 from execucoes.models import Comando
@@ -7,6 +9,16 @@ class MaquinaForm(forms.ModelForm):
     class Meta:
         model = Maquina
         fields = "__all__"
+
+    def clean_mac_address(self):
+        mac = self.cleaned_data['mac_address']
+        mac_regex = r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$'
+        if not re.match(mac_regex, mac):
+            raise ValidationError(
+                "MAC inválido. Formato esperado: XX:XX:XX:XX:XX:XX ou "
+                "XX-XX-XX-XX-XX-XX"
+            )
+        return mac
 
 class SalaForm(forms.ModelForm):
     class Meta:
