@@ -14,4 +14,5 @@ urlpatterns = [
     path('comando/editar/<int:comando_id>/', views.editar_comando, name='editar_comando'),
     path('comandos/novo/', views.criar_comando, name='criar_comando'),
     path('api/executar_maquina/<int:maquina_id>/<int:comando_id>/', views.executar_maquina, name='executar_maquina'),
+    path('comando/deletar/<int:comando_id>/', views.deletar_comando, name='deletar_comando'),
 ]

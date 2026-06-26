@@ -129,3 +129,10 @@ def executar_maquina(request, maquina_id, comando_id):
     )
 
     return JsonResponse({"resultados": resultados})
+
+def deletar_comando(request, comando_id):
+    comando = get_object_or_404(Comando, id=comando_id)
+    if request.method == 'POST':
+        comando.delete()
+        return JsonResponse({"sucesso": True})
+    return JsonResponse({"sucesso": False, "erro": "Método inválido"}, status=405)
