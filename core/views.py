@@ -1,6 +1,6 @@
 from .forms import MaquinaForm, SalaForm, ComandoForm
 from django.http import JsonResponse
-from execucoes.models import Execucao, Comando
+from execucoes.models import Execucao, Comando, ResultadoMaquina
 from salas.models import Sala
 from maquinas.models import Maquina
 from core.utils import scan_arp
@@ -8,17 +8,21 @@ from core.executor import executar_linux, executar_windows, detectar_os, executa
 from django.shortcuts import render, redirect, get_object_or_404
 
 def executar_sala(request, sala_id, comando_id):
-
     sala = Sala.objects.get(id=sala_id)
     comando = Comando.objects.get(id=comando_id)
-
     arp_table = scan_arp()
 
-    resultados = executar_em_paralelo(
-        sala.maquinas.all(),
-        comando,
-        arp_table
-    )
+    resultados = executar_em_paralelo(sala.maquinas.all(), comando, arp_table)
+
+    execucao = Execucao.objects.create(comando=comando, sala=sala)
+    for r in resultados:
+        maquina = Maquina.objects.filter(nome=r['maquina']).first()
+        ResultadoMaquina.objects.create(
+            execucao=execucao,
+            maquina=maquina,
+            status=r['status'],
+            output=r.get('output', '')
+        )
 
     return JsonResponse({"resultados": resultados})
 
@@ -61,12 +65,14 @@ def criar_comando(request):
 def dashboard(request):
     salas = Sala.objects.all()
     comandos = Comando.objects.all()
-    maquinas = Maquina.objects.all() 
+    maquinas = Maquina.objects.all()
+    execucoes = Execucao.objects.prefetch_related('resultados').order_by('-created_at')[:5]
 
     return render(request, "core/dashboard.html", {
         "salas": salas,
         "comandos": comandos,
-        "maquinas": maquinas
+        "maquinas": maquinas,
+        "execucoes": execucoes,
     })
 
 def editar_maquina(request, maquina_id, sala_id):
@@ -116,17 +122,21 @@ def remover_maquina(request, sala_id, maquina_id):
 
 # Atualização para poder escolher um computador específico ao invés de uma sala inteira
 def executar_maquina(request, maquina_id, comando_id):
-
     maquina = get_object_or_404(Maquina, id=maquina_id)
     comando = Comando.objects.get(id=comando_id)
-
     arp_table = scan_arp()
 
-    resultados = executar_em_paralelo(
-        Maquina.objects.filter(id=maquina.id),
-        comando,
-        arp_table
-    )
+    resultados = executar_em_paralelo(Maquina.objects.filter(id=maquina.id), comando, arp_table)
+
+    # Salva no histórico (sem sala)
+    execucao = Execucao.objects.create(comando=comando, sala=None)
+    for r in resultados:
+        ResultadoMaquina.objects.create(
+            execucao=execucao,
+            maquina=maquina,
+            status=r['status'],
+            output=r.get('output', '')
+        )
 
     return JsonResponse({"resultados": resultados})
 

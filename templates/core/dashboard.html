@@ -106,6 +106,80 @@
                     </button>
                 </div>
             </div>
+            <!-- Histórico de Execuções -->
+            <div class="mt-5">
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                    <div class="card-header bg-dark py-3 d-flex justify-content-between align-items-center"
+                        data-bs-toggle="collapse" data-bs-target="#historicoCollapse"
+                        style="cursor: pointer;">
+                        <h5 class="card-title mb-0 text-white">
+                            <i class="bi bi-clock-history text-warning me-2"></i>Últimos Disparos
+                        </h5>
+                        <i class="bi bi-chevron-down text-white" id="iconeHistorico"
+                        style="transition: transform 0.3s;"></i>
+                    </div>
+
+                    <div class="collapse" id="historicoCollapse">
+                        <div class="card-body p-0">
+                            {% if execucoes %}
+                                {% for ex in execucoes %}
+                                <div class="border-bottom p-4">
+                                    <!-- Header da execução -->
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="fw-bold text-body">{{ ex.comando.nome }}</span>
+                                            <span class="text-muted small">
+                                                <i class="bi bi-{% if ex.sala %}building me-1">{{ ex.sala.nome }}{% else %}pc-display me-1">Máquina avulsa{% endif %}</i>
+                                            </span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <!-- Badges de resumo -->
+                                            {% with resultados=ex.resultados.all %}
+                                                {% for r in resultados %}
+                                                    {% if r.status == 'sucesso' %}<span class="badge bg-success">✓</span>
+                                                    {% elif r.status == 'erro' %}<span class="badge bg-danger">✗</span>
+                                                    {% else %}<span class="badge bg-warning text-dark">~</span>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            {% endwith %}
+                                            <span class="text-muted small">
+                                                <i class="bi bi-clock me-1"></i>{{ ex.created_at|date:"d/m/Y H:i" }}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Detalhes das máquinas -->
+                                    {% for r in ex.resultados.all %}
+                                    <div class="d-flex align-items-center gap-2 mt-2 ps-2 border-start border-2
+                                        {% if r.status == 'sucesso' %}border-success
+                                        {% elif r.status == 'erro' %}border-danger
+                                        {% else %}border-warning{% endif %}">
+                                        <span class="small fw-bold text-body" style="min-width: 120px;">
+                                            {{ r.maquina.nome }}
+                                        </span>
+                                        <span class="badge status-badge
+                                            {% if r.status == 'sucesso' %}bg-success
+                                            {% elif r.status == 'erro' %}bg-danger
+                                            {% else %}bg-warning text-dark{% endif %}">
+                                            {{ r.status }}
+                                        </span>
+                                        <code class="small text-muted text-truncate" style="max-width: 400px;">
+                                            {{ r.output|default:"Sem output." }}
+                                        </code>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-center py-5 text-muted">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                    Nenhum disparo registrado ainda.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div id="area-resultados" class="p-4 d-none border-top bg-dark-subtle">
@@ -305,5 +379,12 @@ function executar() {
             });
         });
 }
+
+document.getElementById('historicoCollapse').addEventListener('show.bs.collapse', () => {
+    document.getElementById('iconeHistorico').style.transform = 'rotate(180deg)';
+});
+document.getElementById('historicoCollapse').addEventListener('hide.bs.collapse', () => {
+    document.getElementById('iconeHistorico').style.transform = 'rotate(0deg)';
+});
 </script>
 {% endblock %}
