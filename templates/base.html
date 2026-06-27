@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    {% load static %}
+    <link rel="icon" type="image/png" href="{% static 'logo-ncc.png' %}">
     <title>{{ titulo|default:"NCC | NetCommander" }}</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,7 +59,7 @@
     <nav class="navbar navbar-expand-lg navbar-dark navbar-dark-custom mb-4 shadow-sm py-3">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center fs-4" href="{% url 'home' %}">
-                <i class="bi bi-terminal-fill me-2" style="-webkit-text-fill-color: var(--brand-color);"></i>
+                <img src="{% static 'logo-ncc.png' %}" alt="Logo" height="32" class="me-2">
                 NCC<span class="text-white-50 ms-1">NetCommander</span>
             </a>
             
