@@ -1,3 +1,5 @@
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from .forms import MaquinaForm, SalaForm, ComandoForm
 from django.http import JsonResponse
 from execucoes.models import Execucao, Comando, ResultadoMaquina
@@ -7,6 +9,26 @@ from core.utils import scan_arp
 from core.executor import executar_linux, executar_windows, detectar_os, executar_em_paralelo
 from django.shortcuts import render, redirect, get_object_or_404
 
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("home")
+
+    if request.method == "POST":
+        username = request.POST.get("username")
+        password = request.POST.get("password")
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect("home")
+        return render(request, "core/login.html", {"erro": "Usuário ou senha inválidos."})
+
+    return render(request, "core/login.html")
+
+def logout_view(request):
+    logout(request)
+    return redirect("login")
+
+@login_required
 def executar_sala(request, sala_id, comando_id):
     sala = Sala.objects.get(id=sala_id)
     comando = Comando.objects.get(id=comando_id)
@@ -26,6 +48,7 @@ def executar_sala(request, sala_id, comando_id):
 
     return JsonResponse({"resultados": resultados})
 
+@login_required
 def criar_sala(request):
     form = SalaForm(request.POST or None)
     if form.is_valid():
@@ -34,10 +57,12 @@ def criar_sala(request):
     
     return render(request, "salas/criar_sala.html", {"form": form})
 
+@login_required
 def sala_detail(request, sala_id):
     sala = get_object_or_404(Sala, id=sala_id)
     return render(request, "salas/sala_detail.html", {"sala": sala})
 
+@login_required
 def criar_maquina(request, sala_id=None):
     sala = None
     if sala_id:
@@ -55,6 +80,7 @@ def criar_maquina(request, sala_id=None):
     
     return render(request, "maquinas/criar_maquina.html", {"form": form, "sala": sala})
 
+@login_required
 def criar_comando(request):
     form = ComandoForm(request.POST or None)
     if form.is_valid():
@@ -62,6 +88,7 @@ def criar_comando(request):
         return redirect("home")
     return render(request, "comandos/criar_comando.html", {"form": form})
 
+@login_required
 def dashboard(request):
     salas = Sala.objects.all()
     comandos = Comando.objects.all()
@@ -75,11 +102,11 @@ def dashboard(request):
         "execucoes": execucoes,
     })
 
+@login_required
 def editar_maquina(request, maquina_id, sala_id):
     maquina = get_object_or_404(Maquina, id=maquina_id)
     sala = get_object_or_404(Sala, id=sala_id)
     
-    # Usamos o mesmo MaquinaForm que você já tem
     form = MaquinaForm(request.POST or None, instance=maquina)
     
     if form.is_valid():
@@ -92,35 +119,33 @@ def editar_maquina(request, maquina_id, sala_id):
         "editando": True
     })
 
+@login_required
 def editar_comando(request, comando_id):
     comando = get_object_or_404(Comando, id=comando_id)
     
-    # Preenche o form com os dados do comando atual
     form = ComandoForm(request.POST or None, instance=comando)
     
     if form.is_valid():
         form.save()
-        return redirect('home') # Ou para uma lista de comandos, se tiver
+        return redirect('home')
         
     return render(request, 'core/editar_comando.html', {
         'form': form,
         'comando': comando
     })
 
+@login_required
 def remover_maquina(request, sala_id, maquina_id):
     sala = get_object_or_404(Sala, id=sala_id)
     maquina = get_object_or_404(Maquina, id=maquina_id)
 
-    # Apenas POST realiza a remoção para evitar ações acidentais via GET
     if request.method == 'POST':
         sala.maquinas.remove(maquina)
         return redirect('sala_detail', sala_id=sala.id)
 
-    # Caso cheguem por GET, redirecionamos de volta à página da sala
     return redirect('sala_detail', sala_id=sala.id)
 
-
-# Atualização para poder escolher um computador específico ao invés de uma sala inteira
+@login_required
 def executar_maquina(request, maquina_id, comando_id):
     maquina = get_object_or_404(Maquina, id=maquina_id)
     comando = Comando.objects.get(id=comando_id)
@@ -128,7 +153,6 @@ def executar_maquina(request, maquina_id, comando_id):
 
     resultados = executar_em_paralelo(Maquina.objects.filter(id=maquina.id), comando, arp_table)
 
-    # Salva no histórico (sem sala)
     execucao = Execucao.objects.create(comando=comando, sala=None)
     for r in resultados:
         ResultadoMaquina.objects.create(
@@ -140,6 +164,7 @@ def executar_maquina(request, maquina_id, comando_id):
 
     return JsonResponse({"resultados": resultados})
 
+@login_required
 def deletar_comando(request, comando_id):
     comando = get_object_or_404(Comando, id=comando_id)
     if request.method == 'POST':

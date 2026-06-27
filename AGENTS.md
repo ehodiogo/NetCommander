@@ -261,6 +261,21 @@ Nunca usar `print()` para depuração.
 
 ---
 
+# Autenticação
+
+O sistema de login utiliza:
+
+* credenciais definidas no `.env` (`AUTH_USERNAME`, `AUTH_PASSWORD`)
+* `python-decouple` para ler as variáveis
+* backend customizado em `core/backends.py` (`EnvAuthBackend`)
+* `@login_required` em todas as views protegidas
+* página de login em `/login/`
+* redirecionamento automático via `LOGIN_URL`
+
+Sempre utilizar o decorator `@login_required` para novas views que exigirem autenticação.
+
+---
+
 # Testes
 
 Sempre que houver alteração relevante executar:
