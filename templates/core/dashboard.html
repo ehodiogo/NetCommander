@@ -89,7 +89,6 @@
                     </select>
 
                     <select id="maquina" class="form-select form-select-lg custom-select d-none">
-                        <!-- preenchido via JS -->
                     </select>
                 </div>
                 <div class="col-md-5">
@@ -106,7 +105,7 @@
                     </button>
                 </div>
             </div>
-            <!-- Histórico de Execuções -->
+
             <div class="mt-5">
                 <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
                     <div class="card-header bg-dark py-3 d-flex justify-content-between align-items-center"
@@ -124,7 +123,6 @@
                             {% if execucoes %}
                                 {% for ex in execucoes %}
                                 <div class="border-bottom p-4">
-                                    <!-- Header da execução -->
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <div class="d-flex align-items-center gap-3">
                                             <span class="fw-bold text-body">{{ ex.comando.nome }}</span>
@@ -133,7 +131,6 @@
                                             </span>
                                         </div>
                                         <div class="d-flex align-items-center gap-3">
-                                            <!-- Badges de resumo -->
                                             {% with resultados=ex.resultados.all %}
                                                 {% for r in resultados %}
                                                     {% if r.status == 'sucesso' %}<span class="badge bg-success">✓</span>
@@ -148,7 +145,6 @@
                                         </div>
                                     </div>
 
-                                    <!-- Detalhes das máquinas -->
                                     {% for r in ex.resultados.all %}
                                     <div class="d-flex align-items-center gap-2 mt-2 ps-2 border-start border-2
                                         {% if r.status == 'sucesso' %}border-success
@@ -181,11 +177,14 @@
                 </div>
             </div>
         </div>
-        
+
         <div id="area-resultados" class="p-4 d-none border-top bg-dark-subtle">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="fw-bold mb-0 text-body"><i class="bi bi-terminal me-2"></i>Saída do Sistema</h6>
-                <span class="badge bg-dark rounded-pill">Real-time</span>
+                <span id="progresso-label" class="badge bg-dark rounded-pill">0 / 0</span>
+            </div>
+            <div class="progress mb-3" style="height: 6px;">
+                <div id="barra-progresso" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
             </div>
             <div class="table-responsive">
                 <table class="table table-borderless align-middle" id="tabela">
@@ -193,8 +192,7 @@
                         <tr>
                             <th class="fw-normal">Máquina</th>
                             <th class="fw-normal">IP</th>
-                            <th class="fw-normal">SO</th>
-                            <th class="fw-normal">Status</th>
+                            <th class="fw-normal">Progresso</th>
                             <th class="fw-normal">Terminal Output</th>
                         </tr>
                     </thead>
@@ -242,7 +240,7 @@
                             <i class="bi bi-pencil-fill"></i>
                         </a>
                     </div>
-                    
+
                     <div class="d-flex flex-wrap gap-2">
                         {% if comando.comando_linux %}
                             <div class="bg-dark p-2 rounded w-100 d-flex align-items-center mb-1 border-start border-success border-3">
@@ -250,7 +248,7 @@
                                 <code class="text-success small text-truncate">{{ comando.comando_linux }}</code>
                             </div>
                         {% endif %}
-                        
+
                         {% if comando.comando_windows %}
                             <div class="bg-dark p-2 rounded w-100 d-flex align-items-center border-start border-primary border-3">
                                 <i class="bi bi-windows text-primary me-2"></i>
@@ -269,6 +267,7 @@
 
 let comandoIdParaDeletar = null;
 let modalDelete;
+let pollingInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     modalDelete = new bootstrap.Modal(document.getElementById('modalDelete'));
@@ -291,9 +290,6 @@ document.getElementById('btnConfirmaDelete').addEventListener('click', () => {
         else alert(data.erro || 'Erro ao excluir.');
     });
 });
-
-// Mantive sua lógica de JS, mas adicionei a estilização dos resultados dinâmicos
-// Atualização para poder escolher um computador específico ao invés de uma sala inteira
 
 let modoAtual = "sala";
 
@@ -338,6 +334,77 @@ function setModo(modo) {
     }
 }
 
+function progressoTexto(valor) {
+    const mapa = {
+        'pendente': '⏳ Pendente',
+        'verificando_rede': '📡 Verificando rede',
+        'aguardando_wol': '🔌 Aguardando WoL',
+        'conectando_ssh': '🔗 Conectando SSH',
+        'executando': '⚙️ Executando comando',
+        'concluido': '✅ Concluído',
+        'erro': '❌ Erro',
+    };
+    return mapa[valor] || valor;
+}
+
+function progressoCor(valor) {
+    const mapa = {
+        'pendente': 'bg-secondary',
+        'verificando_rede': 'bg-info',
+        'aguardando_wol': 'bg-warning text-dark',
+        'conectando_ssh': 'bg-info',
+        'executando': 'bg-primary',
+        'concluido': 'bg-success',
+        'erro': 'bg-danger',
+    };
+    return mapa[valor] || 'bg-secondary';
+}
+
+function iniciarPolling(execucaoId) {
+    if (pollingInterval) clearInterval(pollingInterval);
+
+    pollingInterval = setInterval(() => {
+        fetch(`/api/execucao/${execucaoId}/status/`)
+            .then(res => res.json())
+            .then(data => {
+                const total = data.total_maquinas;
+                const concluidas = data.concluidas;
+                const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
+
+                document.getElementById('progresso-label').textContent = `${concluidas} / ${total}`;
+                document.getElementById('barra-progresso').style.width = `${pct}%`;
+
+                const tabelaBody = document.querySelector("#tabela tbody");
+                tabelaBody.innerHTML = "";
+
+                data.resultados.forEach(r => {
+                    let row = document.createElement("tr");
+                    row.className = "border-bottom";
+                    const cor = progressoCor(r.progresso);
+                    const texto = progressoTexto(r.progresso);
+
+                    let outputHtml = '<span class="text-muted small">Aguardando...</span>';
+                    if (r.output) {
+                        outputHtml = `<pre class="terminal-window p-2 mb-0 border-0" style="font-size: 0.7rem; max-height: 100px; overflow-y: auto;">${r.output}</pre>`;
+                    }
+
+                    row.innerHTML = `
+                        <td class="ps-3"><span class="fw-bold text-body">${r.maquina}</span></td>
+                        <td><code class="text-primary">${r.ip || '--'}</code></td>
+                        <td><span class="badge status-badge ${cor}">${texto}</span></td>
+                        <td class="pe-3">${outputHtml}</td>
+                    `;
+                    tabelaBody.appendChild(row);
+                });
+
+                if (data.status === 'concluido' || data.status === 'falha') {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+            });
+    }, 1500);
+}
+
 function executar() {
     const comandoId = document.getElementById("comando").value;
     const areaResultados = document.getElementById("area-resultados");
@@ -352,31 +419,28 @@ function executar() {
         if (!maquinaId || !comandoId) return alert("Selecione a máquina e o comando!");
         url = `/api/executar_maquina/${maquinaId}/${comandoId}/`;
     }
+
     areaResultados.classList.remove("d-none");
-    tabelaBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-grow text-primary"></div><p class="mt-2 text-muted">Aguardando resposta das máquinas...</p></td></tr>`;
+    document.getElementById('progresso-label').textContent = '0 / 0';
+    document.getElementById('barra-progresso').style.width = '0%';
+    tabelaBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-grow text-primary"></div><p class="mt-2 text-muted">Iniciando execução...</p></td></tr>`;
+
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+
     fetch(url)
         .then(res => res.json())
         .then(data => {
-            tabelaBody.innerHTML = "";
-            data.resultados.forEach(r => {
-                let row = document.createElement("tr");
-                row.className = "border-bottom";
-                let corStatus = "bg-secondary";
-                if (r.status === "sucesso") corStatus = "bg-success";
-                if (r.status === "erro") corStatus = "bg-danger";
-                if (r.status === "offline") corStatus = "bg-warning text-dark";
-                let osIcon = r.os === "debian" ? '<i class="bi bi-ubuntu text-danger"></i>' : '<i class="bi bi-windows text-info"></i>';
-                row.innerHTML = `
-                    <td class="ps-3"><span class="fw-bold text-body">${r.maquina}</span></td>
-                    <td><code class="text-primary">${r.ip || '--'}</code></td>
-                    <td>${osIcon} <span class="small text-muted text-capitalize">${r.os || 'N/A'}</span></td>
-                    <td><span class="badge status-badge ${corStatus}">${r.status}</span></td>
-                    <td class="pe-3">
-                        <pre class="terminal-window p-2 mb-0 border-0" style="font-size: 0.7rem; max-height: 100px; overflow-y: auto;">${r.output || 'No logs.'}</pre>
-                    </td>
-                `;
-                tabelaBody.appendChild(row);
-            });
+            if (data.erro) {
+                alert(data.erro);
+                return;
+            }
+            iniciarPolling(data.execucao_id);
+        })
+        .catch(err => {
+            alert('Erro ao iniciar execução: ' + err.message);
         });
 }
 

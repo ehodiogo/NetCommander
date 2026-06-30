@@ -248,8 +248,21 @@ def detectar_os(ip):
             pass
 
 
-def worker(maquina, comando, arp_table):
+def _atualizar_progresso(resultado_id, progresso, status=None, output=None):
+    from execucoes.models import ResultadoMaquina as ResModel
+    kwargs = {"progresso": progresso}
+    if status is not None:
+        kwargs["status"] = status
+    if output is not None:
+        kwargs["output"] = output
+    ResModel.objects.filter(id=resultado_id).update(**kwargs)
+
+
+def worker(maquina, comando, arp_table, resultado_id=None):
     mac_banco = maquina.mac_address.lower().replace('-', ':')
+
+    if resultado_id:
+        _atualizar_progresso(resultado_id, 'verificando_rede')
 
     ip = arp_table.get(mac_banco)
 
@@ -258,6 +271,9 @@ def worker(maquina, comando, arp_table):
 
     if not ip:
         logger.warning("Máquina %s não localizada na rede (ARP/DB)", maquina.nome)
+        if resultado_id:
+            _atualizar_progresso(resultado_id, 'erro', status='offline',
+                                 output="Máquina não localizada na rede (ARP/DB).")
         return {
             "maquina": maquina.nome,
             "status": "offline",
@@ -266,6 +282,9 @@ def worker(maquina, comando, arp_table):
             "output": "Máquina não localizada na rede (ARP/DB)."
         }
 
+    if resultado_id:
+        _atualizar_progresso(resultado_id, 'aguardando_wol')
+
     try:
         online, mensagem, wol_enviado = garantir_maquina_ligada(ip, mac_banco)
     except Exception as e:
@@ -273,6 +292,9 @@ def worker(maquina, comando, arp_table):
             "Erro ao garantir máquina ligada %s (%s): %s",
             maquina.nome, ip, e
         )
+        if resultado_id:
+            _atualizar_progresso(resultado_id, 'erro', status='offline',
+                                 output=f"Erro ao verificar disponibilidade: {e}")
         return {
             "maquina": maquina.nome,
             "ip": ip,
@@ -283,6 +305,8 @@ def worker(maquina, comando, arp_table):
 
     if not online:
         logger.warning("Máquina %s (%s) offline: %s", maquina.nome, ip, mensagem)
+        if resultado_id:
+            _atualizar_progresso(resultado_id, 'erro', status='offline', output=mensagem)
         return {
             "maquina": maquina.nome,
             "ip": ip,
@@ -291,9 +315,15 @@ def worker(maquina, comando, arp_table):
             "output": mensagem,
         }
 
+    if resultado_id:
+        _atualizar_progresso(resultado_id, 'conectando_ssh')
+
     os_execucao = maquina.tipo_os
     if maquina.tipo_os == "dual":
         os_execucao = "debian" if wol_enviado else detectar_os(ip)
+
+    if resultado_id:
+        _atualizar_progresso(resultado_id, 'executando')
 
     try:
         if os_execucao == "debian":
@@ -313,6 +343,9 @@ def worker(maquina, comando, arp_table):
         output = f"Falha na conexão: {str(e)}"
         status = "erro"
 
+    if resultado_id:
+        _atualizar_progresso(resultado_id, 'concluido', status=status, output=output)
+
     return {
         "maquina": maquina.nome,
         "ip": ip,
@@ -326,9 +359,27 @@ def executar_em_paralelo(maquinas, comando, arp_table, execucao=None):
     resultados = []
     futures = []
 
+    resultados_ids = []
+    if execucao is not None:
+        from execucoes.models import ResultadoMaquina as ResModel
+        for m in maquinas:
+            r = ResModel.objects.create(
+                execucao=execucao,
+                maquina=m,
+                status='pendente',
+                progresso='pendente',
+            )
+            resultados_ids.append((m.id, r.id))
+
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         for maquina in maquinas:
-            future = executor.submit(worker, maquina, comando, arp_table)
+            rid = None
+            if execucao is not None:
+                for mid, rid_val in resultados_ids:
+                    if mid == maquina.id:
+                        rid = rid_val
+                        break
+            future = executor.submit(worker, maquina, comando, arp_table, resultado_id=rid)
             futures.append(future)
 
         for future in as_completed(futures):

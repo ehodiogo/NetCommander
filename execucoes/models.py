@@ -31,9 +31,20 @@ class Execucao(models.Model):
         return f"{self.comando.nome} em {self.sala.nome if self.sala else 'máquina avulsa'} ({self.created_at})"
 
 class ResultadoMaquina(models.Model):
+    PROGRESSO_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('verificando_rede', 'Verificando rede'),
+        ('aguardando_wol', 'Aguardando WoL'),
+        ('conectando_ssh', 'Conectando SSH'),
+        ('executando', 'Executando comando'),
+        ('concluido', 'Concluído'),
+        ('erro', 'Erro'),
+    ]
+
     execucao = models.ForeignKey(Execucao, on_delete=models.CASCADE, related_name='resultados')
     maquina = models.ForeignKey('maquinas.Maquina', on_delete=models.CASCADE)
     status = models.CharField(max_length=20)  # sucesso, erro, offline
+    progresso = models.CharField(max_length=20, choices=PROGRESSO_CHOICES, default='pendente')
     output = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
