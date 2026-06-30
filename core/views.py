@@ -2,14 +2,13 @@ import logging
 import threading
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.db import connection
 from .forms import MaquinaForm, SalaForm, ComandoForm
 from django.http import JsonResponse
 from execucoes.models import Execucao, Comando, ResultadoMaquina
 from salas.models import Sala
 from maquinas.models import Maquina
 from core.utils import scan_arp
-from core.executor import executar_em_paralelo
+from core.executor import executar_em_paralelo, EXECUCAO_TIMEOUT
 from django.shortcuts import render, redirect, get_object_or_404
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,10 @@ def _rodar_execucao_sala(execucao_id, sala_id, comando_id):
         execucao.save(update_fields=['status'])
 
         arp_table = scan_arp()
-        executar_em_paralelo(sala.maquinas.all(), comando, arp_table, execucao)
+        executar_em_paralelo(
+            sala.maquinas.all(), comando, arp_table, execucao,
+            timeout=EXECUCAO_TIMEOUT
+        )
 
         execucao.refresh_from_db()
         execucao.status = 'concluido'
@@ -76,7 +78,8 @@ def _rodar_execucao_maquina(execucao_id, maquina_id, comando_id):
 
         arp_table = scan_arp()
         executar_em_paralelo(
-            Maquina.objects.filter(id=maquina.id), comando, arp_table, execucao
+            Maquina.objects.filter(id=maquina.id), comando, arp_table, execucao,
+            timeout=EXECUCAO_TIMEOUT
         )
 
         execucao.refresh_from_db()
@@ -96,11 +99,11 @@ def executar_sala(request, sala_id, comando_id):
     comando = Comando.objects.get(id=comando_id)
 
     em_andamento = Execucao.objects.filter(
-        sala=sala, comando=comando, status='em_andamento'
+        sala=sala, comando=comando, status__in=['pendente', 'em_andamento']
     ).exists()
     if em_andamento:
         return JsonResponse(
-            {"erro": "Já existe uma execução em andamento para esta sala e comando."},
+            {"erro": "Já existe uma execução pendente ou em andamento para esta sala e comando."},
             status=409
         )
 
@@ -113,7 +116,6 @@ def executar_sala(request, sala_id, comando_id):
     thread = threading.Thread(
         target=_rodar_execucao_sala,
         args=(execucao.id, sala_id, comando_id),
-        daemon=True,
     )
     thread.start()
 
@@ -133,7 +135,6 @@ def executar_maquina(request, maquina_id, comando_id):
     thread = threading.Thread(
         target=_rodar_execucao_maquina,
         args=(execucao.id, maquina_id, comando_id),
-        daemon=True,
     )
     thread.start()
 

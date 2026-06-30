@@ -6,9 +6,11 @@ import socket
 import subprocess
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from decouple import config
 import paramiko
+
+EXECUCAO_TIMEOUT = config('EXECUCAO_TIMEOUT', default=300, cast=int)
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +41,21 @@ def _ping_responde(ip):
         return False
 
 
+_broadcasts_cache = None
+
 def _detectar_broadcasts():
+    global _broadcasts_cache
+    if _broadcasts_cache is not None:
+        return _broadcasts_cache.copy()
+
     sistema = platform.system().lower()
     broadcasts = ["255.255.255.255"]
 
     try:
         if sistema == "windows":
             output = subprocess.check_output(
-                "ipconfig", shell=True, encoding='cp1252', errors='replace'
+                "ipconfig", shell=True, encoding='cp1252', errors='replace',
+                timeout=10
             )
             ips = re.findall(
                 r'(?:IPv4|IP|Endere[çc]o).*:\s*(\d+\.\d+\.\d+\.\d+)',
@@ -72,7 +81,8 @@ def _detectar_broadcasts():
                     continue
         else:
             output = subprocess.check_output(
-                ["ip", "addr"], encoding='utf-8', errors='replace'
+                ["ip", "addr"], encoding='utf-8', errors='replace',
+                timeout=10
             )
             for match in re.finditer(r'inet (\d+\.\d+\.\d+\.\d+)/(\d+)', output):
                 try:
@@ -88,6 +98,7 @@ def _detectar_broadcasts():
     except Exception as e:
         logger.warning("Erro ao detectar broadcasts: %s", e)
 
+    _broadcasts_cache = broadcasts.copy()
     logger.info("Broadcasts disponíveis: %s", broadcasts)
     return broadcasts
 
@@ -355,7 +366,7 @@ def worker(maquina, comando, arp_table, resultado_id=None):
     }
 
 
-def executar_em_paralelo(maquinas, comando, arp_table, execucao=None):
+def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=None):
     resultados = []
     futures = []
 
@@ -382,25 +393,34 @@ def executar_em_paralelo(maquinas, comando, arp_table, execucao=None):
             future = executor.submit(worker, maquina, comando, arp_table, resultado_id=rid)
             futures.append(future)
 
-        for future in as_completed(futures):
-            try:
-                resultado = future.result()
-                resultados.append(resultado)
-            except Exception as e:
-                logger.exception("Erro em worker paralelo: %s", e)
-                resultados.append({
-                    "maquina": "desconhecida",
-                    "ip": "N/A",
-                    "os": "N/A",
-                    "status": "erro",
-                    "output": f"Erro interno no worker: {e}"
-                })
+        try:
+            for future in as_completed(futures, timeout=timeout):
+                try:
+                    resultado = future.result()
+                    resultados.append(resultado)
+                except Exception as e:
+                    logger.exception("Erro em worker paralelo: %s", e)
+                    resultados.append({
+                        "maquina": "desconhecida",
+                        "ip": "N/A",
+                        "os": "N/A",
+                        "status": "erro",
+                        "output": f"Erro interno no worker: {e}"
+                    })
 
+                if execucao is not None:
+                    from execucoes.models import Execucao as ExecModel
+                    from django.db.models import F
+                    ExecModel.objects.filter(id=execucao.id).update(
+                        concluidas=F('concluidas') + 1
+                    )
+        except TimeoutError:
+            logger.error("Timeout global de %ss atingido na execução", timeout)
+            for f in futures:
+                f.cancel()
             if execucao is not None:
                 from execucoes.models import Execucao as ExecModel
-                from django.db.models import F
-                ExecModel.objects.filter(id=execucao.id).update(
-                    concluidas=F('concluidas') + 1
-                )
+                ExecModel.objects.filter(id=execucao.id).update(status='falha')
+            raise
 
     return resultados
