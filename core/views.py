@@ -1,3 +1,4 @@
+import logging
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from .forms import MaquinaForm, SalaForm, ComandoForm
@@ -8,6 +9,8 @@ from maquinas.models import Maquina
 from core.utils import scan_arp
 from core.executor import executar_linux, executar_windows, detectar_os, executar_em_paralelo
 from django.shortcuts import render, redirect, get_object_or_404
+
+logger = logging.getLogger(__name__)
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -32,21 +35,44 @@ def logout_view(request):
 def executar_sala(request, sala_id, comando_id):
     sala = Sala.objects.get(id=sala_id)
     comando = Comando.objects.get(id=comando_id)
-    arp_table = scan_arp()
 
-    resultados = executar_em_paralelo(sala.maquinas.all(), comando, arp_table)
-
-    execucao = Execucao.objects.create(comando=comando, sala=sala)
-    for r in resultados:
-        maquina = Maquina.objects.filter(nome=r['maquina']).first()
-        ResultadoMaquina.objects.create(
-            execucao=execucao,
-            maquina=maquina,
-            status=r['status'],
-            output=r.get('output', '')
+    em_andamento = Execucao.objects.filter(
+        sala=sala, comando=comando, status='em_andamento'
+    ).exists()
+    if em_andamento:
+        return JsonResponse(
+            {"erro": "Já existe uma execução em andamento para esta sala e comando."},
+            status=409
         )
 
-    return JsonResponse({"resultados": resultados})
+    total = sala.maquinas.count()
+    execucao = Execucao.objects.create(
+        comando=comando, sala=sala, status='em_andamento',
+        total_maquinas=total, concluidas=0
+    )
+
+    arp_table = scan_arp()
+
+    try:
+        resultados = executar_em_paralelo(sala.maquinas.all(), comando, arp_table, execucao)
+        execucao.status = 'concluido'
+        execucao.save()
+
+        for r in resultados:
+            maquina = Maquina.objects.filter(nome=r['maquina']).first()
+            ResultadoMaquina.objects.create(
+                execucao=execucao,
+                maquina=maquina,
+                status=r['status'],
+                output=r.get('output', '')
+            )
+
+        return JsonResponse({"resultados": resultados})
+    except Exception as e:
+        execucao.status = 'falha'
+        execucao.save()
+        logger.exception("Erro na execução da sala %s", sala_id)
+        return JsonResponse({"erro": f"Erro interno na execução: {e}"}, status=500)
 
 @login_required
 def criar_sala(request):
@@ -149,20 +175,35 @@ def remover_maquina(request, sala_id, maquina_id):
 def executar_maquina(request, maquina_id, comando_id):
     maquina = get_object_or_404(Maquina, id=maquina_id)
     comando = Comando.objects.get(id=comando_id)
+
+    execucao = Execucao.objects.create(
+        comando=comando, sala=None, status='em_andamento',
+        total_maquinas=1, concluidas=0
+    )
+
     arp_table = scan_arp()
 
-    resultados = executar_em_paralelo(Maquina.objects.filter(id=maquina.id), comando, arp_table)
-
-    execucao = Execucao.objects.create(comando=comando, sala=None)
-    for r in resultados:
-        ResultadoMaquina.objects.create(
-            execucao=execucao,
-            maquina=maquina,
-            status=r['status'],
-            output=r.get('output', '')
+    try:
+        resultados = executar_em_paralelo(
+            Maquina.objects.filter(id=maquina.id), comando, arp_table, execucao
         )
+        execucao.status = 'concluido'
+        execucao.save()
 
-    return JsonResponse({"resultados": resultados})
+        for r in resultados:
+            ResultadoMaquina.objects.create(
+                execucao=execucao,
+                maquina=maquina,
+                status=r['status'],
+                output=r.get('output', '')
+            )
+
+        return JsonResponse({"resultados": resultados})
+    except Exception as e:
+        execucao.status = 'falha'
+        execucao.save()
+        logger.exception("Erro na execução individual %s", maquina_id)
+        return JsonResponse({"erro": f"Erro interno na execução: {e}"}, status=500)
 
 @login_required
 def deletar_comando(request, comando_id):

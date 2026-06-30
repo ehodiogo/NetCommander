@@ -6,12 +6,15 @@ import socket
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from decouple import config
 import paramiko
 
 logger = logging.getLogger(__name__)
 
 NCC_PASSWORD = config('NCC_ADMIN_PASSWORD', default='senha_padrao')
+MAX_WORKERS = config('MAX_WORKERS', default=10, cast=int)
+_ip_update_lock = threading.Lock()
 
 
 def _validar_mac(mac):
@@ -245,28 +248,23 @@ def detectar_os(ip):
             pass
 
 
-def worker(maquina, comando, arp_table, resultados, lock):
+def worker(maquina, comando, arp_table):
     mac_banco = maquina.mac_address.lower().replace('-', ':')
 
     ip = arp_table.get(mac_banco)
 
     if not ip:
         ip = maquina.ultimo_ip
-        usa_fallback = True
-    else:
-        usa_fallback = False
 
     if not ip:
         logger.warning("Máquina %s não localizada na rede (ARP/DB)", maquina.nome)
-        with lock:
-            resultados.append({
-                "maquina": maquina.nome,
-                "status": "offline",
-                "ip": "Nenhum",
-                "os": "N/A",
-                "output": "Máquina não localizada na rede (ARP/DB)."
-            })
-        return
+        return {
+            "maquina": maquina.nome,
+            "status": "offline",
+            "ip": "Nenhum",
+            "os": "N/A",
+            "output": "Máquina não localizada na rede (ARP/DB)."
+        }
 
     try:
         online, mensagem, wol_enviado = garantir_maquina_ligada(ip, mac_banco)
@@ -275,27 +273,23 @@ def worker(maquina, comando, arp_table, resultados, lock):
             "Erro ao garantir máquina ligada %s (%s): %s",
             maquina.nome, ip, e
         )
-        with lock:
-            resultados.append({
-                "maquina": maquina.nome,
-                "ip": ip,
-                "os": "N/A",
-                "status": "offline",
-                "output": f"Erro ao verificar disponibilidade: {e}",
-            })
-        return
+        return {
+            "maquina": maquina.nome,
+            "ip": ip,
+            "os": "N/A",
+            "status": "offline",
+            "output": f"Erro ao verificar disponibilidade: {e}",
+        }
 
     if not online:
         logger.warning("Máquina %s (%s) offline: %s", maquina.nome, ip, mensagem)
-        with lock:
-            resultados.append({
-                "maquina": maquina.nome,
-                "ip": ip,
-                "os": "N/A",
-                "status": "offline",
-                "output": mensagem,
-            })
-        return
+        return {
+            "maquina": maquina.nome,
+            "ip": ip,
+            "os": "N/A",
+            "status": "offline",
+            "output": mensagem,
+        }
 
     os_execucao = maquina.tipo_os
     if maquina.tipo_os == "dual":
@@ -309,38 +303,53 @@ def worker(maquina, comando, arp_table, resultados, lock):
 
         status = "sucesso"
 
-        if ip != maquina.ultimo_ip:
-            maquina.ultimo_ip = ip
-            maquina.save()
+        with _ip_update_lock:
+            maquina_atualizada = type(maquina).objects.get(pk=maquina.pk)
+            if ip != maquina_atualizada.ultimo_ip:
+                maquina_atualizada.ultimo_ip = ip
+                maquina_atualizada.save()
 
     except Exception as e:
         output = f"Falha na conexão: {str(e)}"
         status = "erro"
 
-    with lock:
-        resultados.append({
-            "maquina": maquina.nome,
-            "ip": ip,
-            "os": os_execucao,
-            "status": status,
-            "output": output
-        })
+    return {
+        "maquina": maquina.nome,
+        "ip": ip,
+        "os": os_execucao,
+        "status": status,
+        "output": output
+    }
 
 
-def executar_em_paralelo(maquinas, comando, arp_table):
-    threads = []
+def executar_em_paralelo(maquinas, comando, arp_table, execucao=None):
     resultados = []
-    lock = threading.Lock()
+    futures = []
 
-    for maquina in maquinas:
-        t = threading.Thread(
-            target=worker,
-            args=(maquina, comando, arp_table, resultados, lock)
-        )
-        t.start()
-        threads.append(t)
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for maquina in maquinas:
+            future = executor.submit(worker, maquina, comando, arp_table)
+            futures.append(future)
 
-    for t in threads:
-        t.join()
+        for future in as_completed(futures):
+            try:
+                resultado = future.result()
+                resultados.append(resultado)
+            except Exception as e:
+                logger.exception("Erro em worker paralelo: %s", e)
+                resultados.append({
+                    "maquina": "desconhecida",
+                    "ip": "N/A",
+                    "os": "N/A",
+                    "status": "erro",
+                    "output": f"Erro interno no worker: {e}"
+                })
+
+            if execucao is not None:
+                from execucoes.models import Execucao as ExecModel
+                from django.db.models import F
+                ExecModel.objects.filter(id=execucao.id).update(
+                    concluidas=F('concluidas') + 1
+                )
 
     return resultados
