@@ -45,6 +45,7 @@ class ResultadoMaquina(models.Model):
     maquina = models.ForeignKey('maquinas.Maquina', on_delete=models.CASCADE)
     status = models.CharField(max_length=20)  # sucesso, erro, offline
     progresso = models.CharField(max_length=20, choices=PROGRESSO_CHOICES, default='pendente')
+    os_detectado = models.CharField(max_length=20, blank=True, null=True)
     output = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

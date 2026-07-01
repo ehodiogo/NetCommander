@@ -153,6 +153,12 @@
                                         <span class="small fw-bold text-body" style="min-width: 120px;">
                                             {{ r.maquina.nome }}
                                         </span>
+                                        {% if r.os_detectado %}
+                                            <span class="small text-muted">
+                                                {% if r.os_detectado == 'debian' %}🐧{% elif r.os_detectado == 'windows' %}🪟{% else %}❓{% endif %}
+                                                {{ r.os_detectado }}
+                                            </span>
+                                        {% endif %}
                                         <span class="badge status-badge
                                             {% if r.status == 'sucesso' %}bg-success
                                             {% elif r.status == 'erro' %}bg-danger
@@ -192,6 +198,7 @@
                         <tr>
                             <th class="fw-normal">Máquina</th>
                             <th class="fw-normal">IP</th>
+                            <th class="fw-normal">SO Detectado</th>
                             <th class="fw-normal">Progresso</th>
                             <th class="fw-normal">Terminal Output</th>
                         </tr>
@@ -388,9 +395,16 @@ function iniciarPolling(execucaoId) {
                         outputHtml = `<pre class="terminal-window p-2 mb-0 border-0" style="font-size: 0.7rem; max-height: 100px; overflow-y: auto;">${r.output}</pre>`;
                     }
 
+                    let osHtml = '<span class="text-muted small">--</span>';
+                    if (r.os_detectado) {
+                        const osIcon = r.os_detectado === 'debian' ? '🐧' : (r.os_detectado === 'windows' ? '🪟' : '❓');
+                        osHtml = `<span class="small">${osIcon} ${r.os_detectado}</span>`;
+                    }
+
                     row.innerHTML = `
                         <td class="ps-3"><span class="fw-bold text-body">${r.maquina}</span></td>
                         <td><code class="text-primary">${r.ip || '--'}</code></td>
+                        <td>${osHtml}</td>
                         <td><span class="badge status-badge ${cor}">${texto}</span></td>
                         <td class="pe-3">${outputHtml}</td>
                     `;
@@ -423,7 +437,7 @@ function executar() {
     areaResultados.classList.remove("d-none");
     document.getElementById('progresso-label').textContent = '0 / 0';
     document.getElementById('barra-progresso').style.width = '0%';
-    tabelaBody.innerHTML = `<tr><td colspan="4" class="text-center py-5"><div class="spinner-grow text-primary"></div><p class="mt-2 text-muted">Iniciando execução...</p></td></tr>`;
+    tabelaBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-grow text-primary"></div><p class="mt-2 text-muted">Iniciando execução...</p></td></tr>`;
 
     if (pollingInterval) {
         clearInterval(pollingInterval);

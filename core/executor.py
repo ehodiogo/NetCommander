@@ -35,10 +35,24 @@ def _ping_responde(ip):
 
     try:
         resultado = subprocess.run(comando, capture_output=True, text=True, timeout=5)
-        return resultado.returncode == 0
+        if resultado.returncode == 0:
+            ttl_match = re.search(r'[Tt][Tt][Ll][= ](\d+)', resultado.stdout)
+            ttl = int(ttl_match.group(1)) if ttl_match else None
+            return True, ttl
+        return False, None
     except subprocess.TimeoutExpired:
         logger.warning("Timeout no ping para %s", ip)
-        return False
+        return False, None
+
+
+def detectar_os_por_ttl(ttl):
+    if ttl is None:
+        return "desconhecido"
+    if 48 <= ttl <= 80:
+        return "debian"
+    elif 100 <= ttl <= 140:
+        return "windows"
+    return "desconhecido"
 
 
 _broadcasts_cache = None
@@ -158,15 +172,16 @@ def enviar_wol(mac, ip=None, porta=9):
 
 def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5):
     logger.info("Verificando se %s (%s) está online...", ip, mac)
-    if _ping_responde(ip):
-        logger.info("Máquina %s já está online", ip)
-        return True, None, False
+    online, ttl = _ping_responde(ip)
+    if online:
+        logger.info("Máquina %s já está online (TTL: %s)", ip, ttl)
+        return True, None, False, ttl
 
     logger.info("Máquina %s offline. Enviando WoL...", ip)
     sucesso_wol, erro_wol = enviar_wol(mac, ip)
     if not sucesso_wol:
         logger.error("Falha no WoL para %s (%s): %s", mac, ip, erro_wol)
-        return False, f"Falha no WoL: {erro_wol}", False
+        return False, f"Falha no WoL: {erro_wol}", False, None
 
     for i in range(tentativas):
         logger.debug(
@@ -174,14 +189,16 @@ def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5):
             ip, i + 1, tentativas
         )
         time.sleep(intervalo)
-        if _ping_responde(ip):
-            logger.info("Máquina %s está online após WoL", ip)
-            return True, None, True
+        online, ttl = _ping_responde(ip)
+        if online:
+            logger.info("Máquina %s está online após WoL (TTL: %s)", ip, ttl)
+            return True, None, True, ttl
 
     return (
         False,
         f"Máquina não respondeu ao ping após Wake on LAN em {tentativas * intervalo}s.",
         True,
+        None,
     )
 
 
@@ -297,7 +314,7 @@ def worker(maquina, comando, arp_table, resultado_id=None):
         _atualizar_progresso(resultado_id, 'aguardando_wol')
 
     try:
-        online, mensagem, wol_enviado = garantir_maquina_ligada(ip, mac_banco)
+        online, mensagem, wol_enviado, ttl = garantir_maquina_ligada(ip, mac_banco)
     except Exception as e:
         logger.exception(
             "Erro ao garantir máquina ligada %s (%s): %s",
@@ -330,8 +347,12 @@ def worker(maquina, comando, arp_table, resultado_id=None):
         _atualizar_progresso(resultado_id, 'conectando_ssh')
 
     os_execucao = maquina.tipo_os
+    os_detectado = None
     if maquina.tipo_os == "dual":
-        os_execucao = "debian" if wol_enviado else detectar_os(ip)
+        os_detectado = detectar_os_por_ttl(ttl) if ttl is not None else "desconhecido"
+        os_execucao = os_detectado
+    elif ttl is not None:
+        os_detectado = detectar_os_por_ttl(ttl)
 
     if resultado_id:
         _atualizar_progresso(resultado_id, 'executando')
@@ -350,6 +371,10 @@ def worker(maquina, comando, arp_table, resultado_id=None):
                 maquina_atualizada.ultimo_ip = ip
                 maquina_atualizada.save()
 
+        if resultado_id:
+            from execucoes.models import ResultadoMaquina as ResModel
+            ResModel.objects.filter(id=resultado_id).update(os_detectado=os_detectado)
+
     except Exception as e:
         output = f"Falha na conexão: {str(e)}"
         status = "erro"
@@ -361,6 +386,7 @@ def worker(maquina, comando, arp_table, resultado_id=None):
         "maquina": maquina.nome,
         "ip": ip,
         "os": os_execucao,
+        "os_detectado": os_detectado,
         "status": status,
         "output": output
     }

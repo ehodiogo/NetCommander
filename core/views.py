@@ -156,6 +156,7 @@ def execucao_status(request, execucao_id):
                 "ip": r.maquina.ultimo_ip or "",
                 "status": r.status,
                 "progresso": r.progresso,
+                "os_detectado": r.os_detectado or "",
                 "output": r.output if r.progresso in ('concluido', 'erro') else None,
             }
             for r in resultados
