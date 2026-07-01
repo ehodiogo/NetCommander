@@ -18,6 +18,8 @@ NCC_PASSWORD = config('NCC_ADMIN_PASSWORD', default='senha_padrao')
 MAX_WORKERS = config('MAX_WORKERS', default=10, cast=int)
 _ip_update_lock = threading.Lock()
 
+GRUB_WINDOWS_ENTRY = "Windows Boot Manager"
+
 
 def _validar_mac(mac):
     if not mac or len(mac) > 17:
@@ -253,6 +255,41 @@ def executar_windows(ip, comando):
     return _executar_ssh(ip, comando)
 
 
+def _reboot_para_windows(ip, tentativas_max=18, intervalo=10):
+    logger.info("Preparando reboot de %s para Windows...", ip)
+    try:
+        _executar_ssh(
+            ip,
+            f"sudo grub-reboot \"{GRUB_WINDOWS_ENTRY}\" && sudo reboot",
+            timeout=10
+        )
+    except Exception as e:
+        logger.error("Falha ao configurar reboot para Windows em %s: %s", ip, e)
+        return False, None
+
+    logger.info("Aguardando %s desligar (reboot)...", ip)
+    for _ in range(10):
+        time.sleep(3)
+        online, _ = _ping_responde(ip)
+        if not online:
+            logger.info("%s está offline (reiniciando)", ip)
+            break
+    else:
+        logger.warning("%s não desligou após reboot", ip)
+        return False, None
+
+    logger.info("Aguardando %s voltar online (Windows)...", ip)
+    for i in range(tentativas_max):
+        time.sleep(intervalo)
+        online, ttl = _ping_responde(ip)
+        if online:
+            logger.info("%s voltou online (TTL: %s) — Windows detectado", ip, ttl)
+            return True, ttl
+
+    logger.error("%s não voltou online após reboot", ip)
+    return False, None
+
+
 def detectar_os(ip):
     logger.info("Detectando SO em %s", ip)
     cliente = paramiko.SSHClient()
@@ -286,7 +323,7 @@ def _atualizar_progresso(resultado_id, progresso, status=None, output=None):
     ResModel.objects.filter(id=resultado_id).update(**kwargs)
 
 
-def worker(maquina, comando, arp_table, resultado_id=None):
+def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
     mac_banco = maquina.mac_address.lower().replace('-', ':')
 
     if resultado_id:
@@ -348,9 +385,43 @@ def worker(maquina, comando, arp_table, resultado_id=None):
 
     os_execucao = maquina.tipo_os
     os_detectado = None
+
     if maquina.tipo_os == "dual":
-        os_detectado = detectar_os_por_ttl(ttl) if ttl is not None else "desconhecido"
-        os_execucao = os_detectado
+        os_atual = detectar_os_por_ttl(ttl) if ttl is not None else "desconhecido"
+        os_detectado = os_atual
+
+        if os_alvo is not None:
+            os_execucao = os_alvo
+        elif comando.comando_windows and not comando.comando_linux:
+            os_execucao = "windows"
+        elif comando.comando_linux and not comando.comando_windows:
+            os_execucao = "debian"
+        else:
+            os_execucao = os_atual
+
+        if os_execucao == "windows" and os_atual == "debian":
+            if resultado_id:
+                _atualizar_progresso(
+                    resultado_id, 'conectando_ssh',
+                    output="Preparando boot para Windows..."
+                )
+            sucesso, novo_ttl = _reboot_para_windows(ip)
+            if not sucesso:
+                if resultado_id:
+                    _atualizar_progresso(
+                        resultado_id, 'erro', status='erro',
+                        output="Falha ao reiniciar para Windows."
+                    )
+                return {
+                    "maquina": maquina.nome,
+                    "ip": ip,
+                    "os": "N/A",
+                    "os_detectado": os_detectado,
+                    "status": "erro",
+                    "output": "Falha ao reiniciar máquina para Windows.",
+                }
+            ttl = novo_ttl
+
     elif ttl is not None:
         os_detectado = detectar_os_por_ttl(ttl)
 
@@ -392,7 +463,7 @@ def worker(maquina, comando, arp_table, resultado_id=None):
     }
 
 
-def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=None):
+def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=None, os_alvo=None):
     resultados = []
     futures = []
 
@@ -416,7 +487,7 @@ def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=No
                     if mid == maquina.id:
                         rid = rid_val
                         break
-            future = executor.submit(worker, maquina, comando, arp_table, resultado_id=rid)
+            future = executor.submit(worker, maquina, comando, arp_table, resultado_id=rid, os_alvo=os_alvo)
             futures.append(future)
 
         try:

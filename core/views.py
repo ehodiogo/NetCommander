@@ -35,7 +35,7 @@ def logout_view(request):
     return redirect("login")
 
 
-def _rodar_execucao_sala(execucao_id, sala_id, comando_id):
+def _rodar_execucao_sala(execucao_id, sala_id, comando_id, os_alvo=None):
     from django import db
     db.close_old_connections()
 
@@ -50,7 +50,7 @@ def _rodar_execucao_sala(execucao_id, sala_id, comando_id):
         arp_table = scan_arp()
         executar_em_paralelo(
             sala.maquinas.all(), comando, arp_table, execucao,
-            timeout=EXECUCAO_TIMEOUT
+            timeout=EXECUCAO_TIMEOUT, os_alvo=os_alvo
         )
 
         execucao.refresh_from_db()
@@ -64,7 +64,7 @@ def _rodar_execucao_sala(execucao_id, sala_id, comando_id):
             pass
 
 
-def _rodar_execucao_maquina(execucao_id, maquina_id, comando_id):
+def _rodar_execucao_maquina(execucao_id, maquina_id, comando_id, os_alvo=None):
     from django import db
     db.close_old_connections()
 
@@ -79,7 +79,7 @@ def _rodar_execucao_maquina(execucao_id, maquina_id, comando_id):
         arp_table = scan_arp()
         executar_em_paralelo(
             Maquina.objects.filter(id=maquina.id), comando, arp_table, execucao,
-            timeout=EXECUCAO_TIMEOUT
+            timeout=EXECUCAO_TIMEOUT, os_alvo=os_alvo
         )
 
         execucao.refresh_from_db()
@@ -107,6 +107,8 @@ def executar_sala(request, sala_id, comando_id):
             status=409
         )
 
+    os_alvo = request.GET.get('os_alvo') or request.POST.get('os_alvo')
+
     total = sala.maquinas.count()
     execucao = Execucao.objects.create(
         comando=comando, sala=sala, status='pendente',
@@ -116,6 +118,7 @@ def executar_sala(request, sala_id, comando_id):
     thread = threading.Thread(
         target=_rodar_execucao_sala,
         args=(execucao.id, sala_id, comando_id),
+        kwargs={'os_alvo': os_alvo},
     )
     thread.start()
 
@@ -127,6 +130,8 @@ def executar_maquina(request, maquina_id, comando_id):
     maquina = get_object_or_404(Maquina, id=maquina_id)
     comando = Comando.objects.get(id=comando_id)
 
+    os_alvo = request.GET.get('os_alvo') or request.POST.get('os_alvo')
+
     execucao = Execucao.objects.create(
         comando=comando, sala=None, status='pendente',
         total_maquinas=1, concluidas=0
@@ -135,6 +140,7 @@ def executar_maquina(request, maquina_id, comando_id):
     thread = threading.Thread(
         target=_rodar_execucao_maquina,
         args=(execucao.id, maquina_id, comando_id),
+        kwargs={'os_alvo': os_alvo},
     )
     thread.start()
 
@@ -157,7 +163,7 @@ def execucao_status(request, execucao_id):
                 "status": r.status,
                 "progresso": r.progresso,
                 "os_detectado": r.os_detectado or "",
-                "output": r.output if r.progresso in ('concluido', 'erro') else None,
+                "output": r.output or "",
             }
             for r in resultados
         ],

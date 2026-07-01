@@ -52,6 +52,14 @@
         border-color: #2563eb;
         box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.25);
     }
+
+    @keyframes pulse-bg {
+        0%, 100% { background-color: transparent; }
+        50% { background-color: rgba(59, 130, 246, 0.05); }
+    }
+    .tr-processing {
+        animation: pulse-bg 1.5s ease-in-out infinite;
+    }
 </style>
 
 <div class="container mt-4 pb-5">
@@ -93,11 +101,18 @@
                 </div>
                 <div class="col-md-5">
                     <label class="form-label fw-bold text-muted small text-uppercase">Qual comando?</label>
-                    <select id="comando" class="form-select form-select-lg custom-select">
+                    <select id="comando" class="form-select form-select-lg custom-select" onchange="atualizarSeletorOS()">
                         {% for c in comandos %}
                             <option value="{{ c.id }}">{{ c.nome }}</option>
                         {% endfor %}
                     </select>
+                    <div id="os-selector" class="d-none mt-2">
+                        <label class="form-label fw-bold text-muted small text-uppercase">SO Alvo</label>
+                        <div class="btn-group btn-group-sm w-100" role="group">
+                            <button type="button" class="btn btn-outline-success active" data-os="debian" onclick="setOSAlvo('debian')">🐧 Linux</button>
+                            <button type="button" class="btn btn-outline-primary" data-os="windows" onclick="setOSAlvo('windows')">🪟 Windows</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <button class="btn btn-success btn-lg w-100 fw-bold shadow-sm py-3" onclick="executar()">
@@ -300,6 +315,17 @@ document.getElementById('btnConfirmaDelete').addEventListener('click', () => {
 
 let modoAtual = "sala";
 
+let osAlvoAtual = null;
+
+const comandosInfo = {
+    {% for c in comandos %}
+        "{{ c.id }}": {
+            has_linux: {% if c.comando_linux %}true{% else %}false{% endif %},
+            has_windows: {% if c.comando_windows %}true{% else %}false{% endif %},
+        }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
 const salasMaquinas = {
     {% for s in salas %}
         "{{ s.id }}": [
@@ -325,6 +351,31 @@ function atualizarMaquinasDaSala() {
         opt.textContent = `${m.nome} (${m.tipo_os})`;
         maquinaSelect.appendChild(opt);
     });
+}
+
+function atualizarSeletorOS() {
+    const comandoId = document.getElementById("comando").value;
+    const info = comandosInfo[comandoId];
+    const selector = document.getElementById("os-selector");
+
+    if (info && info.has_linux && info.has_windows) {
+        selector.classList.remove("d-none");
+        setOSAlvo('debian');
+    } else {
+        selector.classList.add("d-none");
+        osAlvoAtual = null;
+    }
+}
+
+function setOSAlvo(os) {
+    osAlvoAtual = os;
+    document.querySelectorAll("#os-selector .btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.os === os);
+    });
+}
+
+function getOSAlvo() {
+    return osAlvoAtual;
 }
 
 function setModo(modo) {
@@ -386,13 +437,23 @@ function iniciarPolling(execucaoId) {
 
                 data.resultados.forEach(r => {
                     let row = document.createElement("tr");
-                    row.className = "border-bottom";
+                    const isProcessing = r.progresso !== 'concluido' && r.progresso !== 'erro';
+                    row.className = isProcessing ? "border-bottom tr-processing" : "border-bottom";
+
                     const cor = progressoCor(r.progresso);
                     const texto = progressoTexto(r.progresso);
 
-                    let outputHtml = '<span class="text-muted small">Aguardando...</span>';
-                    if (r.output) {
-                        outputHtml = `<pre class="terminal-window p-2 mb-0 border-0" style="font-size: 0.7rem; max-height: 100px; overflow-y: auto;">${r.output}</pre>`;
+                    let outputHtml;
+                    if (!isProcessing) {
+                        outputHtml = r.output
+                            ? `<pre class="terminal-window p-2 mb-0 border-0" style="font-size: 0.7rem; max-height: 100px; overflow-y: auto;">${r.output}</pre>`
+                            : '<span class="text-muted small">Sem saída.</span>';
+                    } else {
+                        outputHtml = `
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                <span class="text-muted small">${texto}</span>
+                            </div>`;
                     }
 
                     let osHtml = '<span class="text-muted small">--</span>';
@@ -423,6 +484,7 @@ function executar() {
     const comandoId = document.getElementById("comando").value;
     const areaResultados = document.getElementById("area-resultados");
     const tabelaBody = document.querySelector("#tabela tbody");
+    const osAlvo = getOSAlvo();
     let url;
     if (modoAtual === "sala") {
         const salaId = document.getElementById("sala").value;
@@ -432,6 +494,10 @@ function executar() {
         const maquinaId = document.getElementById("maquina").value;
         if (!maquinaId || !comandoId) return alert("Selecione a máquina e o comando!");
         url = `/api/executar_maquina/${maquinaId}/${comandoId}/`;
+    }
+
+    if (osAlvo) {
+        url += `?os_alvo=${osAlvo}`;
     }
 
     areaResultados.classList.remove("d-none");
