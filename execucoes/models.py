@@ -25,6 +25,7 @@ class Execucao(models.Model):
     concluidas = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     iniciado_por = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):

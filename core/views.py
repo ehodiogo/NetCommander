@@ -1,7 +1,10 @@
 import logging
 import threading
+from datetime import timedelta
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 from .forms import MaquinaForm, SalaForm, ComandoForm
 from django.http import JsonResponse
 from execucoes.models import Execucao, Comando, ResultadoMaquina
@@ -12,6 +15,18 @@ from core.executor import executar_em_paralelo, EXECUCAO_TIMEOUT
 from django.shortcuts import render, redirect, get_object_or_404
 
 logger = logging.getLogger(__name__)
+
+
+def _limpar_execucoes_orfas(queryset):
+    limiar = timezone.now() - timedelta(seconds=EXECUCAO_TIMEOUT)
+    orfas = queryset.filter(updated_at__lt=limiar)
+    for ex in orfas:
+        logger.warning(
+            "Execução órfã detectada e marcada como falha: #%s (%s) - última atualização: %s",
+            ex.id, ex.comando.nome, ex.updated_at,
+        )
+    orfas.update(status='falha')
+    return orfas.count()
 
 
 def login_view(request):
@@ -94,16 +109,30 @@ def _rodar_execucao_maquina(execucao_id, maquina_id, comando_id, os_alvo=None):
 
 
 @login_required
+@csrf_exempt
 def executar_sala(request, sala_id, comando_id):
     sala = Sala.objects.get(id=sala_id)
     comando = Comando.objects.get(id=comando_id)
 
-    em_andamento = Execucao.objects.filter(
+    bloqueios = Execucao.objects.filter(
         sala=sala, comando=comando, status__in=['pendente', 'em_andamento']
-    ).exists()
-    if em_andamento:
+    )
+
+    _limpar_execucoes_orfas(bloqueios)
+
+    bloqueios_ativos = bloqueios.exclude(status='falha').exists()
+    if bloqueios_ativos:
+        bloqueio = bloqueios.exclude(status='falha').order_by('created_at').first()
+        idade = timezone.now() - bloqueio.created_at
+        minutos = int(idade.total_seconds() // 60)
+        segundos = int(idade.total_seconds() % 60)
+        idade_str = f"{minutos}m {segundos}s" if minutos else f"{segundos}s"
         return JsonResponse(
-            {"erro": "Já existe uma execução pendente ou em andamento para esta sala e comando."},
+            {
+                "erro": "Já existe uma execução pendente ou em andamento para esta sala e comando.",
+                "execucao_bloqueante_id": bloqueio.id,
+                "idade": idade_str,
+            },
             status=409
         )
 
@@ -126,9 +155,33 @@ def executar_sala(request, sala_id, comando_id):
 
 
 @login_required
+@csrf_exempt
 def executar_maquina(request, maquina_id, comando_id):
     maquina = get_object_or_404(Maquina, id=maquina_id)
     comando = Comando.objects.get(id=comando_id)
+
+    bloqueios = Execucao.objects.filter(
+        sala=None, comando=comando, resultado__maquina=maquina,
+        status__in=['pendente', 'em_andamento']
+    ).distinct()
+
+    _limpar_execucoes_orfas(bloqueios)
+
+    bloqueios_ativos = bloqueios.exclude(status='falha').exists()
+    if bloqueios_ativos:
+        bloqueio = bloqueios.exclude(status='falha').order_by('created_at').first()
+        idade = timezone.now() - bloqueio.created_at
+        minutos = int(idade.total_seconds() // 60)
+        segundos = int(idade.total_seconds() % 60)
+        idade_str = f"{minutos}m {segundos}s" if minutos else f"{segundos}s"
+        return JsonResponse(
+            {
+                "erro": "Já existe uma execução pendente ou em andamento para esta máquina e comando.",
+                "execucao_bloqueante_id": bloqueio.id,
+                "idade": idade_str,
+            },
+            status=409
+        )
 
     os_alvo = request.GET.get('os_alvo') or request.POST.get('os_alvo')
 
