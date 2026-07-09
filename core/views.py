@@ -161,7 +161,7 @@ def executar_maquina(request, maquina_id, comando_id):
     comando = Comando.objects.get(id=comando_id)
 
     bloqueios = Execucao.objects.filter(
-        sala=None, comando=comando, resultado__maquina=maquina,
+        sala=None, comando=comando, resultados__maquina=maquina,
         status__in=['pendente', 'em_andamento']
     ).distinct()
 
