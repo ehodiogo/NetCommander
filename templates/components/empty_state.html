@@ -1,0 +1,9 @@
+{% comment %}
+Estado vazio de listagem.
+Uso: {% include 'components/empty_state.html' with icone='bi-inbox' texto='...' acao_url='...' acao_label='...' %}
+{% endcomment %}
+<div class="text-center py-5 text-muted">
+    <i class="bi {{ icone|default:'bi-inbox' }} fs-1 d-block mb-2" aria-hidden="true"></i>
+    <p class="mb-0">{{ texto }}</p>
+    {% if acao_url %}<a href="{{ acao_url }}" class="btn btn-sm btn-primary mt-3">{{ acao_label|default:'Cadastrar agora' }}</a>{% endif %}
+</div>

@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4 pb-5">
+    {% include 'components/modal_confirmacao.html' with descricao='Confirmar o comando no Terminal?' %}
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+            <li class="breadcrumb-item"><a href="{% url 'execucao' %}">Execução</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Terminal</li>
+        </ol>
+    </nav>
+
+    {% include 'components/page_header.html' with titulo='Terminal' icone='bi-terminal-fill' subtitulo='Execute um comando em massa sem salvar na biblioteca.' %}
+
+    <div class="card shadow border-0 overflow-hidden mb-4">
+        <div class="card-body p-4 bg-body-tertiary">
+            <div class="row g-4">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-muted small text-uppercase">Onde executar?</label>
+                    <div class="btn-group btn-group-sm mb-2 w-100" role="group" aria-label="Modo de execução">
+                        <button type="button" class="btn btn-outline-primary active" id="btn-modo-sala" data-modo="sala">Por Sala</button>
+                        <button type="button" class="btn btn-outline-primary" id="btn-modo-maquina" data-modo="maquina">Por Máquina</button>
+                    </div>
+                    <select id="sala" class="form-select form-select-lg custom-select mb-2" aria-label="Selecionar sala">
+                        {% for s in salas %}
+                            <option value="{{ s.id }}">{{ s.nome }} ({{ s.maquinas.count }} PCs)</option>
+                        {% endfor %}
+                    </select>
+                    <select id="maquina" class="form-select form-select-lg custom-select d-none" aria-label="Selecionar máquina"></select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold text-muted small text-uppercase">SO Alvo</label>
+                    <div class="btn-group btn-group-lg w-100" role="group" aria-label="Sistema operacional alvo">
+                        <button type="button" class="btn btn-outline-success active" data-os="debian">
+                            <i class="bi bi-ubuntu me-1" aria-hidden="true"></i>Linux
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" data-os="windows">
+                            <i class="bi bi-windows me-1" aria-hidden="true"></i>Windows
+                        </button>
+                    </div>
+                    <p class="text-muted small mt-2 mb-0">
+                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>Máquinas em dual boot podem ser reiniciadas para Windows quando necessário.
+                    </p>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-success btn-lg w-100 fw-bold shadow-sm py-3" id="btn-executar">
+                        EXECUTAR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow border-0 overflow-hidden mb-4">
+        <div class="card-header bg-dark py-3 d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0 text-white"><i class="bi bi-terminal me-2 text-success" aria-hidden="true"></i>ncc@coletivo</h5>
+            <span class="badge bg-secondary-subtle text-secondary" id="status-conn"><i class="bi bi-circle me-1" aria-hidden="true"></i>pronto</span>
+        </div>
+        <div class="terminal p-3 terminal-altura" id="terminal">
+            <div id="terminal-saida" aria-live="polite"></div>
+            <div class="d-flex align-items-center">
+                <span class="prompt me-2" id="prompt">ncc@linux:~$</span>
+                <input type="text" id="comando-input" class="terminal-input flex-grow-1" autocomplete="off" spellcheck="false" autofocus aria-label="Digite o comando">
+            </div>
+        </div>
+    </div>
+
+    <div id="area-resultados" class="d-none mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold mb-0 text-body"><i class="bi bi-pc-display me-2" aria-hidden="true"></i>Resultados</h6>
+            <div class="d-flex align-items-center gap-2">
+                <span id="progresso-label" class="badge bg-dark rounded-pill">0 / 0</span>
+                <button class="btn btn-sm btn-outline-danger d-none" id="btn-cancelar" type="button">
+                    <i class="bi bi-x-circle me-1" aria-hidden="true"></i>Cancelar
+                </button>
+            </div>
+        </div>
+        <div class="progress progress-thin mb-3" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="barra-progresso" class="progress-bar bg-success" style="width: 0%"></div>
+        </div>
+        <div id="resultados-lista"></div>
+    </div>
+</div>
+
+{{ salas_json|json_script:"dados-salas" }}
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/terminal.js' %}"></script>
+{% endblock %}

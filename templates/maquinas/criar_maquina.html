@@ -6,7 +6,7 @@
         <div class="col-md-8">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'lista_salas' %}">Salas</a></li>
                     {% if sala %}
                         <li class="breadcrumb-item"><a href="{% url 'sala_detail' sala.id %}">{{ sala.nome }}</a></li>
                     {% endif %}
@@ -36,8 +36,7 @@
                             </h5>
                             <div class="row g-3">
                                 <div class="col-md-12">
-                                    <label class="form-label fw-bold small text-uppercase">Nome da Máquina</label>
-                                    {{ form.nome }}
+                                    {% include 'campo.html' with campo=form.nome help='Nome de identificação da máquina (ex: PC01-LAB01).' %}
                                 </div>
                             </div>
                         </div>
@@ -48,14 +47,10 @@
                             </h5>
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold small text-uppercase">Endereço MAC</label>
-                                    {{ form.mac_address }}
-                                    <div class="form-text">Formato: 00:11:22:33:44:55</div>
+                                    {% include 'campo.html' with campo=form.mac_address help='Formato: 00:11:22:33:44:55' %}
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold small text-uppercase text-primary">IP Fixo / Último IP</label>
-                                    {{ form.ultimo_ip }}
-                                    <div class="form-text">Ex: 10.1.4.35 (Vital para o comando ncc@ip)</div>
+                                    {% include 'campo.html' with campo=form.ultimo_ip help='Ex: 10.1.4.35 (vital para o comando ncc@ip)' %}
                                 </div>
                             </div>
                         </div>
@@ -66,9 +61,7 @@
                             </h5>
                             <div class="row g-3">
                                 <div class="col-md-12">
-                                    <label class="form-label fw-bold small text-uppercase">Tipo de OS</label>
-                                    {{ form.tipo_os }}
-                                    <div class="form-text">Selecione "Dual Boot" se a máquina tiver Windows e Debian.</div>
+                                    {% include 'campo.html' with campo=form.tipo_os help='Selecione "Dual Boot" se a máquina tiver Windows e Debian.' %}
                                 </div>
                             </div>
                         </div>
@@ -81,7 +74,7 @@
                                     <i class="bi bi-x-circle me-1"></i> Cancelar
                                 </a>
                             {% else %}
-                                <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">
+                                <a href="{% url 'lista_salas' %}" class="btn btn-outline-secondary px-4">
                                     <i class="bi bi-x-circle me-1"></i> Cancelar
                                 </a>
                             {% endif %}

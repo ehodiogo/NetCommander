@@ -323,11 +323,45 @@ def _atualizar_progresso(resultado_id, progresso, status=None, output=None):
     ResModel.objects.filter(id=resultado_id).update(**kwargs)
 
 
-def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
+def _execucao_cancelada(resultado_id):
+    from execucoes.models import ResultadoMaquina as ResModel
+    return ResModel.objects.filter(
+        id=resultado_id, execucao__cancelado=True
+    ).exists()
+
+
+def _marcar_cancelada(resultado_id, maquina, ip):
+    _atualizar_progresso(
+        resultado_id, 'concluido', status='cancelado',
+        output="Execução cancelada pelo usuário."
+    )
+    return {
+        "maquina": maquina.nome,
+        "ip": ip,
+        "os": "N/A",
+        "status": "cancelado",
+        "output": "Execução cancelada pelo usuário.",
+    }
+
+
+def _comando_a_executar(comando, os_execucao, comando_texto=None):
+    if comando_texto is not None:
+        return comando_texto
+    if comando is None:
+        return ""
+    if os_execucao == "debian":
+        return comando.comando_linux
+    return comando.comando_windows
+
+
+def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None, comando_texto=None):
     mac_banco = maquina.mac_address.lower().replace('-', ':')
 
     if resultado_id:
         _atualizar_progresso(resultado_id, 'verificando_rede')
+
+    if resultado_id and _execucao_cancelada(resultado_id):
+        return _marcar_cancelada(resultado_id, maquina, maquina.ultimo_ip or "Nenhum")
 
     ip = arp_table.get(mac_banco)
 
@@ -368,6 +402,9 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
             "output": f"Erro ao verificar disponibilidade: {e}",
         }
 
+    if resultado_id and _execucao_cancelada(resultado_id):
+        return _marcar_cancelada(resultado_id, maquina, ip)
+
     if not online:
         logger.warning("Máquina %s (%s) offline: %s", maquina.nome, ip, mensagem)
         if resultado_id:
@@ -385,6 +422,7 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
 
     os_execucao = maquina.tipo_os
     os_detectado = None
+    terminal = comando_texto is not None
 
     if maquina.tipo_os == "dual":
         os_atual = detectar_os_por_ttl(ttl) if ttl is not None else "desconhecido"
@@ -392,9 +430,9 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
 
         if os_alvo is not None:
             os_execucao = os_alvo
-        elif comando.comando_windows and not comando.comando_linux:
+        elif comando is not None and comando.comando_windows and not comando.comando_linux:
             os_execucao = "windows"
-        elif comando.comando_linux and not comando.comando_windows:
+        elif comando is not None and comando.comando_linux and not comando.comando_windows:
             os_execucao = "debian"
         else:
             os_execucao = os_atual
@@ -422,17 +460,24 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
                 }
             ttl = novo_ttl
 
+    elif terminal and os_alvo is not None:
+        os_execucao = os_alvo
     elif ttl is not None:
         os_detectado = detectar_os_por_ttl(ttl)
 
     if resultado_id:
         _atualizar_progresso(resultado_id, 'executando')
 
+    if resultado_id and _execucao_cancelada(resultado_id):
+        return _marcar_cancelada(resultado_id, maquina, ip)
+
+    comando_real = _comando_a_executar(comando, os_execucao, comando_texto)
+
     try:
         if os_execucao == "debian":
-            output = executar_linux(ip, comando.comando_linux)
+            output = executar_linux(ip, comando_real)
         else:
-            output = executar_windows(ip, comando.comando_windows)
+            output = executar_windows(ip, comando_real)
 
         status = "sucesso"
 
@@ -463,7 +508,7 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None):
     }
 
 
-def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=None, os_alvo=None):
+def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=None, os_alvo=None, comando_texto=None):
     resultados = []
     futures = []
 
@@ -487,7 +532,10 @@ def executar_em_paralelo(maquinas, comando, arp_table, execucao=None, timeout=No
                     if mid == maquina.id:
                         rid = rid_val
                         break
-            future = executor.submit(worker, maquina, comando, arp_table, resultado_id=rid, os_alvo=os_alvo)
+            future = executor.submit(
+                worker, maquina, comando, arp_table, resultado_id=rid,
+                os_alvo=os_alvo, comando_texto=comando_texto
+            )
             futures.append(future)
 
         try:

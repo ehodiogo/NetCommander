@@ -1,0 +1,25 @@
+{% comment %}
+Cabeçalho de página padrão.
+Uso:
+{% include 'components/page_header.html' with
+    titulo='...' subtitulo='...' icone='bi-terminal-fill' destaque='...'
+    acoes=[{'url': '...', 'label': '...', 'icone': '...', 'cor': 'btn-primary'}] %}
+{% endcomment %}
+<div class="d-flex justify-content-between align-items-end mb-4">
+    <div>
+        <h2 class="fw-bold mb-0">
+            {% if icone %}<i class="bi {{ icone }} text-primary me-2" aria-hidden="true"></i>{% endif %}
+            {{ titulo }}{% if destaque %} <span class="text-primary">{{ destaque }}</span>{% endif %}
+        </h2>
+        {% if subtitulo %}<p class="text-muted mb-0">{{ subtitulo }}</p>{% endif %}
+    </div>
+    {% if acoes %}
+    <div class="d-flex gap-2 align-items-center">
+        {% for acao in acoes %}
+        <a href="{{ acao.url }}" class="btn {{ acao.cor|default:'btn-primary' }} px-4 py-2">
+            {% if acao.icone %}<i class="bi {{ acao.icone }} me-2" aria-hidden="true"></i>{% endif %}{{ acao.label }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

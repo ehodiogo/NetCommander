@@ -154,6 +154,79 @@ Priorizar:
 * HTML sem duplicação;
 * utilização de template inheritance.
 
+Convenções de UX:
+
+* Erros de validação dos formulários devem ser renderizados via o partial `templates/campo.html` (label + widget + help + erros visíveis). Nunca usar `form.as_p` nem renderizar só o widget.
+* Todo disparo de execução em massa (dashboard e terminal coletivo) deve passar por um modal de confirmação mostrando alvo, SO e comando.
+* Confirmação de ações destrutivas deve usar modal Bootstrap; não usar `confirm()` nativo.
+
+---
+
+# Frontend (F1)
+
+Estrutura de assets:
+
+* `static/css/tokens.css` — design tokens (cores, raio, espaçamento, fontes, sombras) via variáveis CSS `--nc-*`.
+* `static/css/app.css` — estilos globais e componentes; sempre usar os tokens, nunca valores hardcoded.
+* `static/js/*.js` — módulos ES (`<script type="module">`): `app.js` (utils: `fetchJSON`, `escapeHtml`, `showToast`, `lerDadosJSON`), `execucao-poller.js` (classe `ExecucaoPoller`), `execucao.js` (console de disparo), `biblioteca.js` (exclusão de scripts), `historico.js` (chevron de colapso), `terminal.js`, `forms.js`.
+
+Convenções:
+
+* Dados servidos ao JS devem usar `{{ dados|json_script:"id" }}` no template; nunca montar objetos JS com interpolação Django.
+* Endpoints JSON retornam envelope `{ "ok": bool, "dados": ... }` em sucesso e `{ "ok": false, "erros": [...] }` em erro (com status HTTP adequado).
+* Endpoints de mutação exigem CSRF via header `X-CSRFToken` (lido do cookie); não usar `@csrf_exempt`. Páginas que disparam requisições usam `@ensure_csrf_cookie`.
+* Nunca usar `onclick=` inline nem `innerHTML` com dados do servidor sem `escapeHtml`/`textContent`.
+* Acessibilidade: `skip-link`, `:focus-visible`, `aria-live` em áreas dinâmicas, `prefers-reduced-motion`.
+* `block scripts` deve ficar no final do template filho e só deve conter `<script type="module">`.
+
+---
+
+# Organização de Views e Templates (F2)
+
+## Views
+
+Todas as views permanecem no app `core`, organizadas em pacote por domínio:
+
+* `core/views/__init__.py` — re-exporta as views.
+* `core/views/auth.py` — autenticação (`login_view`, `logout_view`).
+* `core/views/dashboard.py` — landing/resumo (`dashboard`).
+* `core/views/execucao.py` — área de execução (`execucao`, `terminal`), execução, terminal e cancelamento.
+* `core/views/gerencia.py` — CRUD de salas, máquinas e comandos (`biblioteca`, `lista_salas`, `criar_*`, `editar_*`, `deletar_*`, `sala_detail`).
+* `core/views/utils.py` — helpers compartilhados (`_resposta_bloqueio`, `_salas_para_json`, etc.).
+
+O `core/urls.py` importa das subviews diretamente.
+
+## Áreas do sistema
+
+O sistema é dividido em 3 áreas de navegação + dashboard:
+
+* **Dashboard** (`home`, `/`) — landing/resumo com contagens (salas, máquinas, scripts, execuções), atalhos para as áreas e histórico recente.
+* **Biblioteca** (`biblioteca`, `/biblioteca/`) — listagem de scripts salvos, criar/editar/excluir (`/comandos/novo/`, `/comando/editar/<id>/`, `/comando/deletar/<id>/`).
+* **Execução** (`execucao`, `/execucao/`) — console de disparo de scripts prontos + histórico; o Terminal (`/terminal/`) fica subordinado a esta área.
+* **Salas** (`lista_salas`, `/salas/`) — listagem de salas, criar sala e CRUD de máquinas (`/salas/...`, `/maquinas/nova/`).
+
+## Templates
+
+* `templates/components/` — componentes reutilizáveis: `badge_status.html`, `modal_confirmacao.html`, `page_header.html`, `empty_state.html`, `toast_container.html`.
+* `templates/core/dashboard.html` — landing/resumo.
+* `templates/core/biblioteca.html` — biblioteca de scripts.
+* `templates/core/execucao.html` — área de execução (console + histórico).
+* `templates/core/dashboard/` — includes: `console.html` (disparo de scripts) e `historico.html` (últimos disparos), usados pelas páginas acima.
+* Páginas grandes devem ser compostas por includes; o template principal apenas orquestra.
+* Componentes com muitos parâmetros usam `{% include %}` com `with` em **linha única** — o lexer do Django não reconhece tags multilinha (sem flag DOTALL), que são renderizadas como texto literal.
+
+---
+
+# Cancelamento de Execução
+
+Toda execução pode ser cancelada de forma cooperativa:
+
+* Campo `Execucao.cancelado` (bool) + status `'cancelado'` em `Execucao` e `ResultadoMaquina`.
+* O endpoint `cancelar_execucao` (POST) marca `cancelado=True`; só aceita status `pendente`/`em_andamento`.
+* O `worker()` verifica `_execucao_cancelada(resultado_id)` em checkpoints (após verificar rede, após WoL e antes do SSH) e aborta marcando o resultado como `cancelado`.
+* `_rodar_execucao_sala`/`_rodar_execucao_maquina` finalizam com status `'cancelado'` se `execucao.cancelado`.
+* Consultas de bloqueio de execuções duplicadas devem excluir `cancelado=True`.
+
 ---
 
 # Banco de Dados
@@ -194,6 +267,20 @@ Toda execução deve possuir tratamento para:
 * retorno do comando.
 
 Nunca executar comandos diretamente dentro das Views.
+
+---
+
+# Terminal
+
+O Terminal permite executar comandos livres em massa sem salvá-los na biblioteca.
+
+Convenções adotadas:
+
+* Execuções de terminal usam `Execucao.comando = None` e armazenam o comando digitado em `Execucao.comando_texto`, além do `Execucao.os_alvo`.
+* `worker()` e `executar_em_paralelo()` aceitam `comando_texto`; quando informado, o comando executado é o texto digitado e `os_alvo` vale para todas as máquinas (não apenas dual boot).
+* A escolha do comando a executar fica isolada em `_comando_a_executar()`.
+* Validação via `TerminalForm` (os_alvo + comando_texto obrigatório).
+* O endpoint `terminal_executar` bloqueia execuções duplicadas filtrando `comando__isnull=True` para a mesma sala/máquina, reutilizando `_resposta_bloqueio()`.
 
 ---
 
@@ -258,21 +345,6 @@ Eventos de WOL, erros de rede, falhas de conexão e resultados de ping devem ser
 Configurar logging no `settings.py` com nível INFO para o app `core`.
 
 Nunca usar `print()` para depuração.
-
----
-
-# Autenticação
-
-O sistema de login utiliza:
-
-* credenciais definidas no `.env` (`AUTH_USERNAME`, `AUTH_PASSWORD`)
-* `python-decouple` para ler as variáveis
-* backend customizado em `core/backends.py` (`EnvAuthBackend`)
-* `@login_required` em todas as views protegidas
-* página de login em `/login/`
-* redirecionamento automático via `LOGIN_URL`
-
-Sempre utilizar o decorator `@login_required` para novas views que exigirem autenticação.
 
 ---
 

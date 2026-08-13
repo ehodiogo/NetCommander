@@ -13,9 +13,7 @@
                         {% csrf_token %}
                         
                         <div class="mb-4">
-                            <label class="form-label fw-bold">Nome do Comando:</label>
-                            {{ form.nome }}
-                            <div class="form-text">Ex: "Atualizar Sistema" ou "Desligar Máquina"</div>
+                            {% include 'campo.html' with campo=form.nome help='Ex: "Atualizar Sistema" ou "Desligar Máquina"' %}
                         </div>
 
                         <div class="mb-4">
@@ -30,23 +28,15 @@
                         <hr>
 
                         <div class="mb-4" id="div_linux">
-                            <label class="form-label fw-bold text-success">
-                                <i class="bi bi-ubuntu"></i> Comando Linux (SSH)
-                            </label>
-                            {{ form.comando_linux }}
-                            <small class="text-muted d-block mt-1">Executado como <code>ncc@ip</code></small>
+                            {% include 'campo.html' with campo=form.comando_linux help='Executado como ncc@ip' %}
                         </div>
 
                         <div class="mb-4" id="div_windows">
-                            <label class="form-label fw-bold text-primary">
-                                <i class="bi bi-windows"></i> Comando Windows (PsExec)
-                            </label>
-                            {{ form.comando_windows }}
-                            <small class="text-muted d-block mt-1">Executado via CMD remoto</small>
+                            {% include 'campo.html' with campo=form.comando_windows help='Executado via CMD remoto' %}
                         </div>
 
                         <div class="d-flex justify-content-between mt-5">
-                            <a href="{% url 'home' %}" class="btn btn-outline-secondary px-4">Cancelar</a>
+                            <a href="{% url 'biblioteca' %}" class="btn btn-outline-secondary px-4">Cancelar</a>
                             <button type="submit" class="btn btn-primary px-5 fw-bold shadow">
                                 <i class="bi bi-check-lg"></i> Salvar Comando
                             </button>

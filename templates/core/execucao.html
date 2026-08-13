@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4 pb-5">
+    {% include 'components/modal_confirmacao.html' %}
+
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Execução</li>
+        </ol>
+    </nav>
+
+    {% include 'components/page_header.html' with titulo='Execução' icone='bi-lightning-charge-fill' subtitulo='Execute scripts salvos em salas ou máquinas e acompanhe os resultados.' acoes=acoes_header %}
+
+    {% include 'core/dashboard/console.html' %}
+</div>
+
+{{ salas_json|json_script:"dados-salas" }}
+{{ comandos_json|json_script:"dados-comandos" }}
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/execucao.js' %}"></script>
+{% endblock %}

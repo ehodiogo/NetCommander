@@ -1,0 +1,9 @@
+{
+  "extends": "stylelint-config-standard",
+  "ignoreFiles": ["static/vendor/**", "staticfiles/**"],
+  "rules": {
+    "custom-property-pattern": "^--nc-",
+    "color-hex-length": "short",
+    "declaration-block-no-redundant-longhand-properties": null
+  }
+}

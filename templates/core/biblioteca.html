@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="modal fade" id="modalDelete" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body py-4">
+                <p class="mb-0">Excluir o script <strong id="nomeComandoDelete"></strong>? Essa ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-dark" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmaDelete">Excluir</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4 pb-5">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+            <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Biblioteca de Scripts</li>
+        </ol>
+    </nav>
+
+    {% include 'components/page_header.html' with titulo='Biblioteca de Scripts' icone='bi-code-slash' subtitulo='Crie, edite e gerencie os scripts salvos para execução em massa.' %}
+
+    <div class="d-flex justify-content-end mb-4">
+        <a href="{% url 'criar_comando' %}" class="btn btn-warning fw-bold px-4">
+            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Novo Script
+        </a>
+    </div>
+
+    {% if comandos %}
+    <div class="list-group list-group-flush shadow-sm rounded-4 border overflow-hidden">
+        {% for comando in comandos %}
+        <div class="list-group-item list-group-item-action border-0 p-4 border-bottom">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="fw-bold text-body fs-5">{{ comando.nome }}</span>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'editar_comando' comando.id %}" class="btn btn-dark btn-sm text-warning rounded-circle" aria-label="Editar {{ comando.nome }}">
+                        <i class="bi bi-pencil-fill" aria-hidden="true"></i>
+                    </a>
+                    <button class="btn btn-dark btn-sm text-danger rounded-circle" type="button" data-delete-comando data-comando-id="{{ comando.id }}" data-comando-nome="{{ comando.nome }}" aria-label="Excluir {{ comando.nome }}">
+                        <i class="bi bi-trash-fill" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                {% if comando.comando_linux %}
+                    <div class="bg-dark p-2 rounded w-100 d-flex align-items-center mb-1 border-start border-success border-3">
+                        <i class="bi bi-ubuntu text-success me-2" aria-hidden="true"></i>
+                        <code class="text-success small text-truncate">{{ comando.comando_linux }}</code>
+                    </div>
+                {% endif %}
+
+                {% if comando.comando_windows %}
+                    <div class="bg-dark p-2 rounded w-100 d-flex align-items-center border-start border-primary border-3">
+                        <i class="bi bi-windows text-primary me-2" aria-hidden="true"></i>
+                        <code class="text-primary small text-truncate">{{ comando.comando_windows }}</code>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+        {% include 'components/empty_state.html' with icone='bi-code-slash' texto='Nenhum script cadastrado ainda.' acao_url=acao_criar_comando acao_label='Criar script' %}
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/biblioteca.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,296 @@
+/* ==========================================================================
+   NetCommander — app.css
+   Base, componentes e utilitários. Design tokens em tokens.css.
+   ========================================================================== */
+
+/* ---- Base ----------------------------------------------------------------- */
+body {
+  font-family: var(--nc-font-sans);
+  background-color: var(--nc-bg-base);
+  color: var(--nc-text);
+}
+
+code,
+pre {
+  font-family: var(--nc-font-mono) !important;
+}
+
+code {
+  background-color: var(--nc-bg-elevated);
+  padding: 2px 5px;
+  border-radius: var(--nc-radius-sm);
+  border: 1px solid var(--nc-border-strong);
+}
+
+/* ---- Acessibilidade -------------------------------------------------------- */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 1rem;
+  z-index: 2000;
+  background: var(--nc-primary);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: var(--nc-radius-sm);
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--nc-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---- Navbar ---------------------------------------------------------------- */
+.navbar-dark-custom {
+  background-color: var(--nc-bg-elevated) !important;
+  border-bottom: 1px solid var(--nc-border);
+}
+
+.navbar-brand {
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: var(--nc-primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ---- Footer ---------------------------------------------------------------- */
+.footer {
+  margin-top: var(--nc-space-7);
+  padding: var(--nc-space-6) 0;
+  border-top: 1px solid var(--nc-border);
+  color: var(--nc-text-muted);
+}
+
+/* ---- Botões ---------------------------------------------------------------- */
+.btn {
+  border-radius: var(--nc-radius-md);
+}
+
+.btn-success {
+  background: var(--nc-success-gradient);
+  border: none;
+}
+
+.btn-success:hover {
+  filter: brightness(1.05);
+}
+
+/* ---- Cards ----------------------------------------------------------------- */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.card-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--nc-shadow-hover) !important;
+}
+
+/* ---- Badges de status ------------------------------------------------------ */
+.status-badge {
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 0.5em 0.8em;
+}
+
+/* ---- Selects --------------------------------------------------------------- */
+.custom-select {
+  border: 2px solid transparent;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.custom-select:focus {
+  border-color: var(--nc-primary);
+  box-shadow: var(--nc-focus-ring);
+}
+
+/* ---- Tabelas --------------------------------------------------------------- */
+.table-hover tbody tr:hover {
+  background-color: rgba(13, 110, 253, 0.15);
+}
+
+/* ---- Linha em processamento ------------------------------------------------ */
+@keyframes nc-pulse-bg {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.05);
+  }
+}
+
+.tr-processing {
+  animation: nc-pulse-bg 1.5s ease-in-out infinite;
+}
+
+/* ---- Utilitários ----------------------------------------------------------- */
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.progress-thin {
+  height: 6px;
+}
+
+.chevron-collapse {
+  transition: transform 0.3s ease;
+}
+
+.chevron-collapse.rotated {
+  transform: rotate(180deg);
+}
+
+.w-min-120 {
+  min-width: 120px;
+}
+
+.w-max-400 {
+  max-width: 400px;
+}
+
+/* ---- Terminal (janela, prompt, saída) -------------------------------------- */
+.terminal {
+  background: var(--nc-bg-base);
+  border: 1px solid var(--nc-border);
+  border-radius: var(--nc-radius-md);
+  font-family: var(--nc-font-mono) !important;
+  font-size: 0.85rem;
+  color: var(--nc-text-code);
+}
+
+.terminal-linha {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 0.35rem;
+}
+
+.terminal-linha.ok {
+  color: var(--nc-terminal-ok);
+}
+
+.terminal-linha.erro {
+  color: var(--nc-terminal-erro);
+}
+
+.terminal-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--nc-text-code);
+  font-family: var(--nc-font-mono) !important;
+  font-size: 0.85rem;
+  caret-color: var(--nc-caret);
+}
+
+.prompt {
+  color: var(--nc-terminal-ok);
+  white-space: nowrap;
+}
+
+.terminal-pre {
+  background: var(--nc-bg-elevated);
+  border: 1px solid var(--nc-border);
+  border-radius: var(--nc-radius-sm);
+  padding: 0.6rem 0.8rem;
+  margin-top: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  color: var(--nc-text-code);
+}
+
+.terminal-window {
+  background: var(--nc-bg-inset);
+  color: var(--nc-text-code);
+  border-radius: var(--nc-radius-sm);
+  box-shadow: var(--nc-shadow-card);
+}
+
+.small-output {
+  font-size: 0.7rem;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.terminal-altura {
+  height: 380px;
+  overflow-y: auto;
+}
+
+/* ---- Toasts ---------------------------------------------------------------- */
+.toast-container-nc {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 320px;
+  max-width: 420px;
+}
+
+.toast-nc {
+  background: var(--nc-bg-elevated);
+  border: 1px solid var(--nc-border);
+  border-radius: var(--nc-radius-md);
+  box-shadow: var(--nc-shadow-card);
+  color: var(--nc-text);
+  overflow: hidden;
+  animation: nc-toast-in 0.2s ease;
+}
+
+.toast-nc.success {
+  border-left: 4px solid var(--nc-success);
+}
+
+.toast-nc.error {
+  border-left: 4px solid var(--nc-danger);
+}
+
+.toast-nc.warning {
+  border-left: 4px solid var(--nc-warning);
+}
+
+.toast-nc.info {
+  border-left: 4px solid var(--nc-info);
+}
+
+@keyframes nc-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- Estados de listagem --------------------------------------------------- */
+.list-group-item {
+  background-color: var(--nc-bg-elevated);
+}
+
+.list-group-item:hover {
+  background-color: var(--nc-bg-hover);
+}

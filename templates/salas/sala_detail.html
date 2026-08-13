@@ -1,11 +1,28 @@
 {% extends 'base.html' %}
 
 {% block content %}
+<div class="modal fade" id="modalRemoverMaquina" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body py-4">
+                <p class="mb-0">Remover <strong id="nomeMaquinaRemover"></strong> desta sala?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-dark" data-bs-dismiss="modal">Cancelar</button>
+                <form method="post" id="form-remover-maquina">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Remover</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="container mt-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb mb-2">
-            <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
-            <li class="breadcrumb-item active">{{ sala.nome }}</li>
+            <li class="breadcrumb-item"><a href="{% url 'lista_salas' %}">Salas</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ sala.nome }}</li>
         </ol>
     </nav>
 
@@ -15,10 +32,10 @@
             <p class="text-muted mb-0">{{ sala.maquinas.count }} máquinas vinculadas a este setor.</p>
         </div>
         <a href="{% url 'criar_maquina_sala' sala.id %}" class="btn btn-success shadow-sm px-4">
-            <i class="bi bi-plus-circle-fill me-2"></i>Nova Máquina
+            <i class="bi bi-plus-circle-fill me-2" aria-hidden="true"></i>Nova Máquina
         </a>
     </div>
-    
+
     <div class="card shadow-sm border-0">
         <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Inventário de Máquinas</h5>
@@ -42,7 +59,7 @@
                             <td class="ps-4">
                                 <div class="d-flex align-items-center">
                                     <div class="rounded-circle bg-dark-subtle p-2 me-3">
-                                        <i class="bi bi-display text-secondary"></i>
+                                        <i class="bi bi-display text-secondary" aria-hidden="true"></i>
                                     </div>
                                     <span class="fw-bold">{{ maquina.nome }}</span>
                                 </div>
@@ -51,41 +68,38 @@
                             <td>
                                 {% if maquina.ultimo_ip %}
                                     <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-3 py-2">
-                                        <i class="bi bi-ethernet me-1"></i> {{ maquina.ultimo_ip }}
+                                        <i class="bi bi-ethernet me-1" aria-hidden="true"></i> {{ maquina.ultimo_ip }}
                                     </span>
                                 {% else %}
-                                    <span class="text-muted small italic">Não definido</span>
+                                    <span class="text-muted small fst-italic">Não definido</span>
                                 {% endif %}
                             </td>
                             <td>
                                 <div class="d-flex align-items-center">
                                     {% if maquina.tipo_os == 'debian' %}
-                                        <i class="bi bi-ubuntu text-danger me-2 fs-5"></i>
+                                        <i class="bi bi-ubuntu text-danger me-2 fs-5" aria-hidden="true"></i>
                                     {% elif maquina.tipo_os == 'windows' %}
-                                        <i class="bi bi-windows text-primary me-2 fs-5"></i>
+                                        <i class="bi bi-windows text-primary me-2 fs-5" aria-hidden="true"></i>
                                     {% else %}
-                                        <i class="bi bi-intersect text-warning me-2 fs-5"></i>
+                                        <i class="bi bi-intersect text-warning me-2 fs-5" aria-hidden="true"></i>
                                     {% endif %}
                                     {{ maquina.get_tipo_os_display }}
                                 </div>
                             </td>
                             <td class="text-center">
                                 <a href="{% url 'editar_maquina' sala.id maquina.id %}" class="btn btn-sm btn-warning shadow-sm px-3 me-2">
-                                    <i class="bi bi-pencil-square me-1"></i> Editar / Fixar IP
+                                    <i class="bi bi-pencil-square me-1" aria-hidden="true"></i> Editar / Fixar IP
                                 </a>
 
-                                <form method="post" action="{% url 'remover_maquina' sala.id maquina.id %}" style="display:inline-block;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Remover {{ maquina.nome }} desta sala?');">
-                                        <i class="bi bi-trash me-1"></i> Remover
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-danger" data-remover-maquina data-maquina-nome="{{ maquina.nome }}" data-remover-url="{% url 'remover_maquina' sala.id maquina.id %}">
+                                    <i class="bi bi-trash me-1" aria-hidden="true"></i> Remover
+                                </button>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
                             <td colspan="5" class="text-center py-5">
-                                <i class="bi bi-search fs-1 text-muted d-block mb-3"></i>
+                                <i class="bi bi-search fs-1 text-muted d-block mb-3" aria-hidden="true"></i>
                                 <p class="text-muted">Nenhuma máquina cadastrada nesta sala.</p>
                                 <a href="{% url 'criar_maquina_sala' sala.id %}" class="btn btn-sm btn-primary">Cadastrar agora</a>
                             </td>
@@ -96,23 +110,25 @@
             </div>
         </div>
     </div>
-    
+
     <div class="mt-4 pb-5">
-        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-2"></i>Voltar ao Dashboard
+        <a href="{% url 'lista_salas' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2" aria-hidden="true"></i>Voltar às Salas
         </a>
     </div>
 </div>
 
-<style>
-    code {
-        background-color: #2d333b;
-        padding: 2px 5px;
-        border-radius: 4px;
-        border: 1px solid #444c56;
-    }
-    .table-hover tbody tr:hover {
-        background-color: rgba(13, 110, 253, 0.15);
-    }
-</style>
+<script type="module">
+    const modal = new bootstrap.Modal(document.getElementById('modalRemoverMaquina'));
+    const form = document.getElementById('form-remover-maquina');
+    const nome = document.getElementById('nomeMaquinaRemover');
+
+    document.querySelectorAll('[data-remover-maquina]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            nome.textContent = btn.dataset.maquinaNome;
+            form.action = btn.dataset.removerUrl;
+            modal.show();
+        });
+    });
+</script>
 {% endblock %}

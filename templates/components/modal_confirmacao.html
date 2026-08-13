@@ -1,0 +1,30 @@
+{% comment %}
+Modal de confirmação de execução (dashboard e terminal coletivo).
+Uso:
+{% include 'components/modal_confirmacao.html' with
+    descricao='...' modal_id='modalConfirmarExecucao' confirmar_id='btnConfirmarExecucao' %}
+{% endcomment %}
+<div class="modal fade" id="{{ modal_id|default:'modalConfirmarExecucao' }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark">
+                <h5 class="modal-title text-white"><i class="bi bi-lightning-charge-fill text-warning me-2" aria-hidden="true"></i>Confirmar Execução</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">{{ descricao|default:"Confira os dados antes de disparar o comando em massa:" }}</p>
+                <div class="bg-dark p-3 rounded-3">
+                    <div class="mb-2"><span class="text-muted small text-uppercase">Alvo:</span> <strong class="ms-2" id="conf-alvo"></strong></div>
+                    <div class="mb-2"><span class="text-muted small text-uppercase">Comando:</span> <code class="ms-2" id="conf-comando"></code></div>
+                    <div><span class="text-muted small text-uppercase">SO Alvo:</span> <span class="ms-2 fw-bold" id="conf-os"></span></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-dark" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success fw-bold" id="{{ confirmar_id|default:'btnConfirmarExecucao' }}">
+                    <i class="bi bi-rocket-takeoff me-1" aria-hidden="true"></i>Executar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

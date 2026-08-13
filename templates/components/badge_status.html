@@ -1,0 +1,10 @@
+{% comment %}
+Badge de status de resultado de execução.
+Uso: {% include 'components/badge_status.html' with status=r.status %}
+{% endcomment %}
+<span class="badge status-badge
+    {% if status == 'sucesso' %}bg-success
+    {% elif status == 'erro' %}bg-danger
+    {% else %}bg-warning text-dark{% endif %}">
+    {{ status }}
+</span>
