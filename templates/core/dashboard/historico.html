@@ -42,25 +42,33 @@
                         </div>
 
                         {% for r in ex.resultados.all %}
-                        <div class="d-flex align-items-center gap-2 mt-2 ps-2 border-start border-2
+                        <div class="mt-2 ps-2 border-start border-2
                             {% if r.status == 'sucesso' %}border-success
                             {% elif r.status == 'erro' %}border-danger
                             {% else %}border-warning{% endif %}">
-                            <span class="small fw-bold text-body w-min-120">
-                                {{ r.maquina.nome }}
-                            </span>
-                            {% if r.os_detectado %}
-                                <span class="small text-muted">
-                                    {% if r.os_detectado == 'debian' %}<i class="bi bi-ubuntu" aria-hidden="true"></i>
-                                    {% elif r.os_detectado == 'windows' %}<i class="bi bi-windows" aria-hidden="true"></i>
-                                    {% else %}<i class="bi bi-question-circle" aria-hidden="true"></i>{% endif %}
-                                    {{ r.os_detectado }}
+                            <div class="d-flex align-items-center gap-2 cursor-pointer"
+                                data-bs-toggle="collapse" data-bs-target="#outputResultado{{ r.id }}"
+                                aria-expanded="false" aria-controls="outputResultado{{ r.id }}">
+                                <span class="small fw-bold text-body w-min-120">
+                                    {{ r.maquina.nome }}
                                 </span>
-                            {% endif %}
-                            {% include 'components/badge_status.html' with status=r.status %}
-                            <code class="small text-muted text-truncate w-max-400">
-                                {{ r.output|default:"Sem output." }}
-                            </code>
+                                {% if r.os_detectado %}
+                                    <span class="small text-muted">
+                                        {% if r.os_detectado == 'debian' %}<i class="bi bi-ubuntu" aria-hidden="true"></i>
+                                        {% elif r.os_detectado == 'windows' %}<i class="bi bi-windows" aria-hidden="true"></i>
+                                        {% else %}<i class="bi bi-question-circle" aria-hidden="true"></i>{% endif %}
+                                        {{ r.os_detectado }}
+                                    </span>
+                                {% endif %}
+                                {% include 'components/badge_status.html' with status=r.status %}
+                                <code class="small text-muted text-truncate w-max-400">
+                                    {{ r.output|default:"Sem output." }}
+                                </code>
+                                <i class="bi bi-chevron-down text-muted chevron-collapse ms-auto" aria-hidden="true"></i>
+                            </div>
+                            <div class="collapse" id="outputResultado{{ r.id }}">
+                                <pre class="terminal-pre small-output mb-0">{{ r.output|default:"Sem output." }}</pre>
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
