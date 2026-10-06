@@ -256,6 +256,24 @@ Antes de executar comandos remotos deve-se:
 
 ---
 
+# Verificação de Disponibilidade
+
+Toda checagem de "a máquina está online?" passa obrigatoriamente pelos helpers de `core/utils.py`:
+
+* `ping_responde(ip, sistema=None)` — executa ping com as flags da plataforma do **servidor** e retorna `(online, ttl)`. Windows: `ping -n 1 -w <ms>`. Unix: `ping -c 1 -W <s>`. Nunca usar flags de uma plataforma na outra.
+* `porta_ssh_responde(ip, porta, timeout)` — testa a porta SSH com `socket.create_connection`.
+* `maquina_esta_online(ip, porta_ssh, sistema=None)` — helper central: ping primeiro; **somente no Windows**, se o ping falhar, testa a porta SSH como fallback.
+
+Convenções:
+
+* O fallback TCP existe porque o firewall do Windows normalmente bloqueia ICMP e libera o OpenSSH. Com ele, uma máquina com ICMP bloqueado é considerada online e o `worker()` chega a tentar o SSH via paramiko.
+* O fallback é restrito ao Windows de propósito: no Linux o ping é confiável e o teste de porta apenas adiciona latência.
+* `ttl` pode ser `None` quando a máquina só foi confirmada pela porta SSH. Chamadores já devem tratar `ttl is None` (`detectar_os_por_ttl` retorna `"desconhecido"`).
+* `Maquina.porta_ssh` (default `22`) é a porta usada no fallback e na conexão SSH. `worker()` sempre repassa `maquina.porta_ssh` para `garantir_maquina_ligada()` e para `executar_linux()`/`executar_windows()`.
+* Timeouts vêm do ambiente: `PING_TIMEOUT_MS`, `PING_TIMEOUT_SEGUNDOS`, `TIMEOUT_PORTA_SSH_SEGUNDOS`.
+
+---
+
 # Execução Remota
 
 Toda execução deve possuir tratamento para:
@@ -267,6 +285,8 @@ Toda execução deve possuir tratamento para:
 * retorno do comando.
 
 Nunca executar comandos diretamente dentro das Views.
+
+A porta SSH configurada na máquina deve ser repassada até o `paramiko.connect(port=...)`; assumir 22 dentro do executor ignora a configuração da máquina.
 
 ---
 

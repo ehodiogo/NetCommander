@@ -52,6 +52,9 @@
                                 <div class="col-md-6">
                                     {% include 'campo.html' with campo=form.ultimo_ip help='Ex: 10.1.4.35 (vital para o comando ncc@ip)' %}
                                 </div>
+                                <div class="col-md-6">
+                                    {% include 'campo.html' with campo=form.porta_ssh help='Porta do OpenSSH (padrão 22). Usada para verificar disponibilidade e conectar.' %}
+                                </div>
                             </div>
                         </div>
 

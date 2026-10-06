@@ -10,6 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError
 from decouple import config
 import paramiko
 
+from core.utils import PORTA_SSH_PADRAO, maquina_esta_online, ping_responde
+
 EXECUCAO_TIMEOUT = config('EXECUCAO_TIMEOUT', default=300, cast=int)
 
 logger = logging.getLogger(__name__)
@@ -25,26 +27,6 @@ def _validar_mac(mac):
     if not mac or len(mac) > 17:
         return False
     return bool(re.match(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', mac))
-
-
-def _ping_responde(ip):
-    sistema = platform.system().lower()
-
-    if sistema == "windows":
-        comando = ["ping", "-n", "1", "-w", "1000", ip]
-    else:
-        comando = ["ping", "-c", "1", "-W", "1", ip]
-
-    try:
-        resultado = subprocess.run(comando, capture_output=True, text=True, timeout=5)
-        if resultado.returncode == 0:
-            ttl_match = re.search(r'[Tt][Tt][Ll][= ](\d+)', resultado.stdout)
-            ttl = int(ttl_match.group(1)) if ttl_match else None
-            return True, ttl
-        return False, None
-    except subprocess.TimeoutExpired:
-        logger.warning("Timeout no ping para %s", ip)
-        return False, None
 
 
 def detectar_os_por_ttl(ttl):
@@ -172,9 +154,9 @@ def enviar_wol(mac, ip=None, porta=9):
     return True, None
 
 
-def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5):
+def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5, porta_ssh=PORTA_SSH_PADRAO):
     logger.info("Verificando se %s (%s) está online...", ip, mac)
-    online, ttl = _ping_responde(ip)
+    online, ttl = maquina_esta_online(ip, porta_ssh)
     if online:
         logger.info("Máquina %s já está online (TTL: %s)", ip, ttl)
         return True, None, False, ttl
@@ -191,7 +173,7 @@ def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5):
             ip, i + 1, tentativas
         )
         time.sleep(intervalo)
-        online, ttl = _ping_responde(ip)
+        online, ttl = maquina_esta_online(ip, porta_ssh)
         if online:
             logger.info("Máquina %s está online após WoL (TTL: %s)", ip, ttl)
             return True, None, True, ttl
@@ -204,15 +186,16 @@ def garantir_maquina_ligada(ip, mac, tentativas=12, intervalo=5):
     )
 
 
-def _executar_ssh(ip, comando, timeout=10):
+def _executar_ssh(ip, comando, timeout=10, porta=PORTA_SSH_PADRAO):
     """Executa um comando via SSH com paramiko."""
-    logger.info("Conectando via SSH em %s", ip)
+    logger.info("Conectando via SSH em %s:%s", ip, porta or PORTA_SSH_PADRAO)
     cliente = paramiko.SSHClient()
     cliente.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     try:
         cliente.connect(
             hostname=ip,
+            port=porta or PORTA_SSH_PADRAO,
             username='ncc',
             password=NCC_PASSWORD,
             timeout=timeout,
@@ -247,21 +230,22 @@ def _executar_ssh(ip, comando, timeout=10):
             pass
 
 
-def executar_linux(ip, comando):
-    return _executar_ssh(ip, comando)
+def executar_linux(ip, comando, porta=PORTA_SSH_PADRAO):
+    return _executar_ssh(ip, comando, porta=porta)
 
 
-def executar_windows(ip, comando):
-    return _executar_ssh(ip, comando)
+def executar_windows(ip, comando, porta=PORTA_SSH_PADRAO):
+    return _executar_ssh(ip, comando, porta=porta)
 
 
-def _reboot_para_windows(ip, tentativas_max=18, intervalo=10):
+def _reboot_para_windows(ip, tentativas_max=18, intervalo=10, porta_ssh=PORTA_SSH_PADRAO):
     logger.info("Preparando reboot de %s para Windows...", ip)
     try:
         _executar_ssh(
             ip,
             f"sudo grub-reboot \"{GRUB_WINDOWS_ENTRY}\" && sudo reboot",
-            timeout=10
+            timeout=10,
+            porta=porta_ssh
         )
     except Exception as e:
         logger.error("Falha ao configurar reboot para Windows em %s: %s", ip, e)
@@ -270,7 +254,9 @@ def _reboot_para_windows(ip, tentativas_max=18, intervalo=10):
     logger.info("Aguardando %s desligar (reboot)...", ip)
     for _ in range(10):
         time.sleep(3)
-        online, _ = _ping_responde(ip)
+        # Aqui o ping puro serve: com ICMP bloqueado a máquina sempre parece
+        # desligada, o que é exatamente o que esta etapa espera observar.
+        online, _ = ping_responde(ip)
         if not online:
             logger.info("%s está offline (reiniciando)", ip)
             break
@@ -281,7 +267,7 @@ def _reboot_para_windows(ip, tentativas_max=18, intervalo=10):
     logger.info("Aguardando %s voltar online (Windows)...", ip)
     for i in range(tentativas_max):
         time.sleep(intervalo)
-        online, ttl = _ping_responde(ip)
+        online, ttl = maquina_esta_online(ip, porta_ssh)
         if online:
             logger.info("%s voltou online (TTL: %s) — Windows detectado", ip, ttl)
             return True, ttl
@@ -356,6 +342,7 @@ def _comando_a_executar(comando, os_execucao, comando_texto=None):
 
 def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None, comando_texto=None):
     mac_banco = maquina.mac_address.lower().replace('-', ':')
+    porta_ssh = maquina.porta_ssh or PORTA_SSH_PADRAO
 
     if resultado_id:
         _atualizar_progresso(resultado_id, 'verificando_rede')
@@ -385,7 +372,9 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None, comando
         _atualizar_progresso(resultado_id, 'aguardando_wol')
 
     try:
-        online, mensagem, wol_enviado, ttl = garantir_maquina_ligada(ip, mac_banco)
+        online, mensagem, wol_enviado, ttl = garantir_maquina_ligada(
+            ip, mac_banco, porta_ssh=porta_ssh
+        )
     except Exception as e:
         logger.exception(
             "Erro ao garantir máquina ligada %s (%s): %s",
@@ -443,7 +432,7 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None, comando
                     resultado_id, 'conectando_ssh',
                     output="Preparando boot para Windows..."
                 )
-            sucesso, novo_ttl = _reboot_para_windows(ip)
+            sucesso, novo_ttl = _reboot_para_windows(ip, porta_ssh=porta_ssh)
             if not sucesso:
                 if resultado_id:
                     _atualizar_progresso(
@@ -475,9 +464,9 @@ def worker(maquina, comando, arp_table, resultado_id=None, os_alvo=None, comando
 
     try:
         if os_execucao == "debian":
-            output = executar_linux(ip, comando_real)
+            output = executar_linux(ip, comando_real, porta=porta_ssh)
         else:
-            output = executar_windows(ip, comando_real)
+            output = executar_windows(ip, comando_real, porta=porta_ssh)
 
         status = "sucesso"
 

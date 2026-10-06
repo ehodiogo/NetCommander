@@ -16,6 +16,12 @@ class MaquinaForm(forms.ModelForm):
             'tipo_os': forms.Select(attrs={'class': 'form-select'}),
             'os_preferido': forms.TextInput(attrs={'class': 'form-control'}),
             'ultimo_ip': forms.TextInput(attrs={'class': 'form-control'}),
+            'porta_ssh': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1,
+                'max': 65535,
+                'step': 1,
+            }),
         }
 
     def clean_mac_address(self):

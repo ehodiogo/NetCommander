@@ -1,3 +1,4 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 class Maquina(models.Model):
@@ -16,6 +17,13 @@ class Maquina(models.Model):
     os_preferido = models.CharField(max_length=10, blank=True, null=True)
 
     ultimo_ip = models.GenericIPAddressField(blank=True, null=True)
+
+    porta_ssh = models.PositiveSmallIntegerField(
+        default=22,
+        validators=[MinValueValidator(1), MaxValueValidator(65535)],
+        verbose_name="Porta SSH",
+        help_text="Porta usada na conexão SSH e na verificação de disponibilidade.",
+    )
 
     def __str__(self):
         return self.nome

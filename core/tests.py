@@ -1,14 +1,148 @@
+import io
+import subprocess
 from unittest import mock
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from core.forms import TerminalForm
-from core.executor import _comando_a_executar, _execucao_cancelada, worker
+from core.forms import MaquinaForm, TerminalForm
+from core.executor import (
+    _comando_a_executar,
+    _execucao_cancelada,
+    garantir_maquina_ligada,
+    worker,
+)
+from core.utils import maquina_esta_online, ping_responde, porta_ssh_responde
 from execucoes.models import Execucao, Comando, ResultadoMaquina
 from salas.models import Sala
 from maquinas.models import Maquina
 
 User = get_user_model()
+
+
+def _resultado_ping(returncode=0, stdout=''):
+    return mock.Mock(returncode=returncode, stdout=stdout, stderr='')
+
+
+class PingFlagsTests(TestCase):
+    def test_windows_usa_n_1_e_w_em_milissegundos(self):
+        with mock.patch('core.utils.platform.system', return_value='Windows'), \
+             mock.patch('core.utils.subprocess.run',
+                        return_value=_resultado_ping(stdout='TTL=128')) as mock_run:
+            online, ttl = ping_responde('10.0.0.9')
+
+        self.assertTrue(online)
+        self.assertEqual(ttl, 128)
+        self.assertEqual(
+            mock_run.call_args[0][0],
+            ['ping', '-n', '1', '-w', '1000', '10.0.0.9'],
+        )
+
+    def test_linux_mantem_c_1_e_w_em_segundos(self):
+        with mock.patch('core.utils.platform.system', return_value='Linux'), \
+             mock.patch('core.utils.subprocess.run',
+                        return_value=_resultado_ping(stdout='ttl=64')) as mock_run:
+            online, ttl = ping_responde('10.0.0.9')
+
+        self.assertTrue(online)
+        self.assertEqual(ttl, 64)
+        self.assertEqual(
+            mock_run.call_args[0][0],
+            ['ping', '-c', '1', '-W', '1', '10.0.0.9'],
+        )
+
+    def test_ping_sem_resposta_retorna_offline(self):
+        with mock.patch('core.utils.platform.system', return_value='Windows'), \
+             mock.patch('core.utils.subprocess.run',
+                        return_value=_resultado_ping(returncode=1)):
+            self.assertEqual(ping_responde('10.0.0.9'), (False, None))
+
+    def test_timeout_no_ping_retorna_offline(self):
+        with mock.patch('core.utils.platform.system', return_value='Linux'), \
+             mock.patch('core.utils.subprocess.run',
+                        side_effect=subprocess.TimeoutExpired('ping', 5)):
+            self.assertEqual(ping_responde('10.0.0.9'), (False, None))
+
+
+class PortaSshTests(TestCase):
+    def test_porta_aberta(self):
+        with mock.patch('core.utils.socket.create_connection') as mock_conn:
+            self.assertTrue(porta_ssh_responde('10.0.0.9', 2222))
+        mock_conn.assert_called_once()
+        self.assertEqual(mock_conn.call_args[0][0], ('10.0.0.9', 2222))
+
+    def test_porta_fechada(self):
+        with mock.patch('core.utils.socket.create_connection',
+                        side_effect=OSError('recusada')):
+            self.assertFalse(porta_ssh_responde('10.0.0.9'))
+
+    def test_porta_padrao_quando_vazia(self):
+        with mock.patch('core.utils.socket.create_connection') as mock_conn:
+            porta_ssh_responde('10.0.0.9', None)
+        self.assertEqual(mock_conn.call_args[0][0][1], 22)
+
+
+class MaquinaEstaOnlineTests(TestCase):
+    def test_online_quando_ping_responde(self):
+        with mock.patch('core.utils.ping_responde', return_value=(True, 128)) as mock_ping, \
+             mock.patch('core.utils.porta_ssh_responde') as mock_porta:
+            self.assertEqual(maquina_esta_online('10.0.0.9'), (True, 128))
+        mock_porta.assert_not_called()
+        mock_ping.assert_called_once()
+
+    def test_windows_usa_fallback_tcp_quando_ping_falha(self):
+        with mock.patch('core.utils.platform.system', return_value='Windows'), \
+             mock.patch('core.utils.subprocess.run',
+                        return_value=_resultado_ping(returncode=1)), \
+             mock.patch('core.utils.socket.create_connection') as mock_conn:
+            online, ttl = maquina_esta_online('10.0.0.9', 2222)
+
+        self.assertTrue(online)
+        self.assertIsNone(ttl)
+        self.assertEqual(mock_conn.call_args[0][0], ('10.0.0.9', 2222))
+
+    def test_linux_nao_usa_fallback_tcp(self):
+        with mock.patch('core.utils.platform.system', return_value='Linux'), \
+             mock.patch('core.utils.subprocess.run',
+                        return_value=_resultado_ping(returncode=1)), \
+             mock.patch('core.utils.socket.create_connection') as mock_conn:
+            self.assertEqual(maquina_esta_online('10.0.0.9', 2222), (False, None))
+        mock_conn.assert_not_called()
+
+    def test_windows_offline_quando_ping_e_porta_falham(self):
+        with mock.patch('core.utils.platform.system', return_value='Windows'), \
+             mock.patch('core.utils.subprocess.run',
+                        return_value=_resultado_ping(returncode=1)), \
+             mock.patch('core.utils.socket.create_connection',
+                        side_effect=OSError('recusada')):
+            self.assertEqual(maquina_esta_online('10.0.0.9'), (False, None))
+
+
+class PortaSshMaquinaTests(TestCase):
+    def test_porta_padrao_no_cadastro(self):
+        maquina = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55', tipo_os='windows'
+        )
+        self.assertEqual(maquina.porta_ssh, 22)
+
+    def test_form_aceita_porta_customizada(self):
+        form = MaquinaForm(data={
+            'nome': 'PC1',
+            'mac_address': '00:11:22:33:44:55',
+            'tipo_os': 'windows',
+            'porta_ssh': 2222,
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['porta_ssh'], 2222)
+
+    def test_form_recusa_porta_invalida(self):
+        form = MaquinaForm(data={
+            'nome': 'PC1',
+            'mac_address': '00:11:22:33:44:55',
+            'tipo_os': 'windows',
+            'porta_ssh': 70000,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('porta_ssh', form.errors)
 
 
 class TerminalFormTests(TestCase):
@@ -338,3 +472,103 @@ class WorkerCancelamentoTests(TestCase):
 
     def test_execucao_nao_cancelada_segue_normal(self):
         self.assertFalse(_execucao_cancelada(-1))
+
+
+class PortaSshExecucaoTests(TestCase):
+    def setUp(self):
+        self.sala = Sala.objects.create(nome='Lab 1')
+        self.maquina = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55',
+            tipo_os='windows', ultimo_ip='10.0.0.9', porta_ssh=2222,
+        )
+        self.maquina_padrao = Maquina.objects.create(
+            nome='PC2', mac_address='00:11:22:33:44:66',
+            tipo_os='windows', ultimo_ip='10.0.0.10',
+        )
+
+    def _windows_sem_icmp(self):
+        """Ping falha, mas a porta SSH responde (firewall bloqueia ICMP)."""
+        return (
+            mock.patch('core.utils.platform.system', return_value='Windows'),
+            mock.patch('core.utils.subprocess.run',
+                       return_value=_resultado_ping(returncode=1)),
+            mock.patch('core.utils.socket.create_connection'),
+        )
+
+    def test_garantir_maquina_ligada_nao_envia_wol_quando_so_a_porta_responde(self):
+        sistema, ping, conexao = self._windows_sem_icmp()
+        with sistema, ping, conexao, \
+             mock.patch('core.executor.enviar_wol') as mock_wol:
+            online, mensagem, wol_enviado, ttl = garantir_maquina_ligada(
+                '10.0.0.9', '00:11:22:33:44:55', porta_ssh=2222
+            )
+
+        self.assertTrue(online)
+        self.assertFalse(wol_enviado)
+        self.assertIsNone(ttl)
+        mock_wol.assert_not_called()
+
+    def test_garantir_maquina_ligada_envia_wol_quando_nada_responde(self):
+        sistema, ping, _ = self._windows_sem_icmp()
+        with sistema, ping, \
+             mock.patch('core.utils.socket.create_connection',
+                        side_effect=OSError('recusada')), \
+             mock.patch('core.executor.enviar_wol',
+                        return_value=(False, 'MAC inválido')) as mock_wol:
+            online, mensagem, wol_enviado, ttl = garantir_maquina_ligada(
+                '10.0.0.9', '00:11:22:33:44:55', porta_ssh=2222
+            )
+
+        self.assertFalse(online)
+        self.assertFalse(wol_enviado)
+        mock_wol.assert_called_once()
+
+    def test_worker_conecta_ssh_na_porta_configurada(self):
+        sistema, ping, conexao = self._windows_sem_icmp()
+        with sistema, ping, conexao, \
+             mock.patch('core.executor.paramiko.SSHClient') as mock_cls:
+            cliente = mock_cls.return_value
+            cliente.exec_command.return_value = (
+                io.BytesIO(b''), io.BytesIO(b'PC1'), io.BytesIO(b'')
+            )
+            res = worker(
+                self.maquina, None, {'00:11:22:33:44:55': '10.0.0.9'},
+                os_alvo='windows', comando_texto='whoami'
+            )
+
+        self.assertEqual(res['status'], 'sucesso')
+        self.assertEqual(res['output'], 'PC1')
+        self.assertEqual(cliente.connect.call_args.kwargs['port'], 2222)
+
+    def test_worker_usa_porta_22_quando_nao_configurada(self):
+        sistema, ping, conexao = self._windows_sem_icmp()
+        with sistema, ping, conexao, \
+             mock.patch('core.executor.paramiko.SSHClient') as mock_cls:
+            cliente = mock_cls.return_value
+            cliente.exec_command.return_value = (
+                io.BytesIO(b''), io.BytesIO(b'PC2'), io.BytesIO(b'')
+            )
+            res = worker(
+                self.maquina_padrao, None, {'00:11:22:33:44:66': '10.0.0.10'},
+                os_alvo='windows', comando_texto='whoami'
+            )
+
+        self.assertEqual(res['status'], 'sucesso')
+        self.assertEqual(cliente.connect.call_args.kwargs['port'], 22)
+
+    def test_worker_repassa_porta_ssh_para_garantir_maquina_ligada(self):
+        sistema, ping, conexao = self._windows_sem_icmp()
+        with sistema, ping, conexao, \
+             mock.patch('core.executor.garantir_maquina_ligada',
+                        return_value=(True, None, False, None)) as mock_garantir, \
+             mock.patch('core.executor.paramiko.SSHClient') as mock_cls:
+            mock_cls.return_value.exec_command.return_value = (
+                io.BytesIO(b''), io.BytesIO(b'PC1'), io.BytesIO(b'')
+            )
+            worker(
+                self.maquina, None, {}, os_alvo='windows', comando_texto='whoami'
+            )
+
+        self.assertEqual(
+            mock_garantir.call_args.kwargs['porta_ssh'], 2222
+        )
