@@ -168,7 +168,7 @@ Estrutura de assets:
 
 * `static/css/tokens.css` — design tokens (cores, raio, espaçamento, fontes, sombras) via variáveis CSS `--nc-*`.
 * `static/css/app.css` — estilos globais e componentes; sempre usar os tokens, nunca valores hardcoded.
-* `static/js/*.js` — módulos ES (`<script type="module">`): `app.js` (utils: `fetchJSON`, `escapeHtml`, `showToast`, `lerDadosJSON`), `execucao-poller.js` (classe `ExecucaoPoller`), `execucao.js` (console de disparo), `biblioteca.js` (exclusão de scripts), `historico.js` (chevron de colapso), `terminal.js`, `forms.js`.
+* `static/js/*.js` — módulos ES (`<script type="module">`): `app.js` (utils: `fetchJSON`, `escapeHtml`, `showToast`, `lerDadosJSON`), `execucao-poller.js` (classe `ExecucaoPoller`), `execucao.js` (console de disparo), `biblioteca.js` (exclusão de scripts), `historico.js` (chevron de colapso), `terminal.js`, `forms.js`, `dashboard-grafico.js` (anima as barras do gráfico de desempenho).
 
 Convenções:
 
@@ -200,7 +200,7 @@ O `core/urls.py` importa das subviews diretamente.
 
 O sistema é dividido em 3 áreas de navegação + dashboard:
 
-* **Dashboard** (`home`, `/`) — landing/resumo com contagens (salas, máquinas, scripts, execuções), atalhos para as áreas e histórico recente.
+* **Dashboard** (`home`, `/`) — landing/resumo com contagens (salas, máquinas, scripts, execuções), gráfico de desempenho das últimas execuções, atalhos para as áreas e histórico recente.
 * **Biblioteca** (`biblioteca`, `/biblioteca/`) — listagem de scripts salvos, criar/editar/excluir (`/comandos/novo/`, `/comando/editar/<id>/`, `/comando/deletar/<id>/`).
 * **Execução** (`execucao`, `/execucao/`) — console de disparo de scripts prontos + histórico; o Terminal (`/terminal/`) fica subordinado a esta área.
 * **Salas** (`lista_salas`, `/salas/`) — listagem de salas, criar sala e CRUD de máquinas (`/salas/...`, `/maquinas/nova/`).
@@ -214,6 +214,7 @@ O sistema é dividido em 3 áreas de navegação + dashboard:
 * `templates/core/dashboard/` — includes: `console.html` (disparo de scripts) e `historico.html` (últimos disparos), usados pelas páginas acima.
 * Páginas grandes devem ser compostas por includes; o template principal apenas orquestra.
 * Componentes com muitos parâmetros usam `{% include %}` com `with` em **linha única** — o lexer do Django não reconhece tags multilinha (sem flag DOTALL), que são renderizadas como texto literal.
+* **Nunca rodar `prettier --write` em `templates/`**: o parser HTML do prettier quebra tags Django (`{{ ... }}` viram `{{` + quebra de linha, renderizadas como texto literal) da mesma forma que tags multilinha. Manter toda tag `{{ }}`, `{% %}` em linha única e validar templates via `python manage.py test`, não via prettier.
 
 ---
 
@@ -301,6 +302,20 @@ Convenções adotadas:
 * A escolha do comando a executar fica isolada em `_comando_a_executar()`.
 * Validação via `TerminalForm` (os_alvo + comando_texto obrigatório).
 * O endpoint `terminal_executar` bloqueia execuções duplicadas filtrando `comando__isnull=True` para a mesma sala/máquina, reutilizando `_resposta_bloqueio()`.
+
+---
+
+# Estatísticas do Dashboard
+
+A página inicial exibe um gráfico de desempenho agregado das últimas execuções.
+
+Convenções adotadas:
+
+* Agregação isolada em `core/estatisticas.py` (`estatisticas_execucoes(limite=10)`); a view `dashboard` apenas injeta o resultado no contexto.
+* Fonte: últimos N `Execucao` + seus `ResultadoMaquina`. Sucesso = `status == 'sucesso'`; qualquer outro status (`erro`, `offline`, `cancelado`, ...) conta como falha.
+* Ranking por sala agrupa por `execucao.sala`; resultados de execuções avulsas (sala nula) são ignorados em todos os totais.
+* Template em `templates/core/dashboard/estatisticas.html` (include); gráfico sem dependências externas — donut via `conic-gradient` (`--nc-donut-valor`) e barras via `.nc-barra` em `app.css`, sempre com tokens `--nc-*`.
+* Dados espelhados ao JS via `{{ estatisticas|json_script:"dados-estatisticas" }}`; `dashboard-grafico.js` apenas anima as barras (render server-side é o fallback sem JS).
 
 ---
 

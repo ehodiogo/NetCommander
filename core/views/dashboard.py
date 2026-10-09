@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 
+from core.estatisticas import LIMITE_PADRAO, estatisticas_execucoes
 from execucoes.models import Comando, Execucao
 from maquinas.models import Maquina
 from salas.models import Sala
@@ -72,4 +73,5 @@ def dashboard(request):
         "resumo": resumo,
         "areas": areas,
         "execucoes": execucoes,
+        "estatisticas": estatisticas_execucoes(LIMITE_PADRAO),
     })

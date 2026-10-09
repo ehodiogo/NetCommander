@@ -4,6 +4,7 @@ from unittest import mock
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+from core.estatisticas import estatisticas_execucoes
 from core.forms import MaquinaForm, TerminalForm
 from core.executor import (
     _comando_a_executar,
@@ -572,3 +573,105 @@ class PortaSshExecucaoTests(TestCase):
         self.assertEqual(
             mock_garantir.call_args.kwargs['porta_ssh'], 2222
         )
+
+
+class EstatisticasTests(TestCase):
+    def _resultado(self, execucao, maquina, status):
+        return ResultadoMaquina.objects.create(
+            execucao=execucao, maquina=maquina,
+            status=status, progresso='concluido',
+        )
+
+    def test_sem_dados_retorna_zeros(self):
+        stats = estatisticas_execucoes()
+        self.assertEqual(stats['total_execucoes'], 0)
+        self.assertEqual(stats['total_resultados'], 0)
+        self.assertEqual(stats['taxa_sucesso'], 0.0)
+        self.assertEqual(stats['taxa_falha'], 0.0)
+        self.assertEqual(stats['por_sala'], [])
+        self.assertIsNone(stats['melhor_sala'])
+        self.assertIsNone(stats['pior_sala'])
+
+    def test_taxas_e_ranking_por_sala(self):
+        sala_a = Sala.objects.create(nome='Lab A')
+        sala_b = Sala.objects.create(nome='Lab B')
+        execucao = Execucao.objects.create(sala=sala_a, status='concluido')
+        execucao.sala = sala_a
+        execucao.save()
+        m1 = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55', tipo_os='debian'
+        )
+        m2 = Maquina.objects.create(
+            nome='PC2', mac_address='00:11:22:33:44:66', tipo_os='debian'
+        )
+        m3 = Maquina.objects.create(
+            nome='PC3', mac_address='00:11:22:33:44:77', tipo_os='debian'
+        )
+        sala_a.maquinas.add(m1, m2)
+        sala_b.maquinas.add(m3)
+        self._resultado(execucao, m1, 'sucesso')
+        self._resultado(execucao, m2, 'sucesso')
+        execucao2 = Execucao.objects.create(sala=sala_b, status='falha')
+        self._resultado(execucao2, m3, 'offline')
+
+        stats = estatisticas_execucoes()
+        self.assertEqual(stats['total_resultados'], 3)
+        self.assertEqual(stats['sucessos'], 2)
+        self.assertEqual(stats['falhas'], 1)
+        self.assertEqual(stats['taxa_sucesso'], 66.7)
+        self.assertEqual(stats['taxa_falha'], 33.3)
+        self.assertEqual(stats['melhor_sala']['sala_nome'], 'Lab A')
+        self.assertEqual(stats['pior_sala']['sala_nome'], 'Lab B')
+
+    def test_falha_inclui_erro_offline_e_cancelado(self):
+        sala = Sala.objects.create(nome='Lab 1')
+        execucao = Execucao.objects.create(sala=sala, status='concluido')
+        for i, status in enumerate(['sucesso', 'erro', 'offline', 'cancelado']):
+            maquina = Maquina.objects.create(
+                nome=f'PC{i}', mac_address=f'00:11:22:33:44:{50 + i:02d}',
+                tipo_os='debian',
+            )
+            self._resultado(execucao, maquina, status)
+
+        stats = estatisticas_execucoes()
+        self.assertEqual(stats['sucessos'], 1)
+        self.assertEqual(stats['falhas'], 3)
+        self.assertEqual(stats['taxa_sucesso'], 25.0)
+
+    def test_maquinas_avulsas_fora_da_estatistica(self):
+        sala = Sala.objects.create(nome='Lab 1')
+        exec_sala = Execucao.objects.create(sala=sala, status='concluido')
+        exec_avulsa = Execucao.objects.create(sala=None, status='concluido')
+        maquina_sala = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55', tipo_os='debian'
+        )
+        maquina_avulsa = Maquina.objects.create(
+            nome='PC2', mac_address='00:11:22:33:44:66', tipo_os='debian'
+        )
+        self._resultado(exec_sala, maquina_sala, 'sucesso')
+        self._resultado(exec_avulsa, maquina_avulsa, 'erro')
+
+        stats = estatisticas_execucoes()
+        self.assertEqual(stats['total_resultados'], 1)
+        self.assertEqual(stats['sucessos'], 1)
+        self.assertEqual(stats['falhas'], 0)
+        self.assertEqual(len(stats['por_sala']), 1)
+        self.assertEqual(stats['por_sala'][0]['sala_nome'], 'Lab 1')
+
+    def test_dashboard_expoe_estatisticas(self):
+        client = Client()
+        user = User.objects.create_user(username='admin', password='x')
+        client.force_login(user)
+        sala = Sala.objects.create(nome='Lab 1')
+        maquina = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55', tipo_os='debian'
+        )
+        sala.maquinas.add(maquina)
+        execucao = Execucao.objects.create(sala=sala, status='concluido')
+        self._resultado(execucao, maquina, 'sucesso')
+
+        resp = client.get(reverse('home'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Desempenho das Execuções')
+        self.assertContains(resp, 'id="dados-estatisticas"')
+        self.assertContains(resp, 'Lab 1')

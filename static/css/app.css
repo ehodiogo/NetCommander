@@ -294,3 +294,52 @@ code {
 .list-group-item:hover {
   background-color: var(--nc-bg-hover);
 }
+
+/* ---- Gráfico de desempenho (dashboard) ------------------------------------- */
+.nc-donut {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--nc-success) var(--nc-donut-valor, 0%),
+    var(--nc-danger) 0
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nc-donut-centro {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background: var(--nc-bg-elevated);
+  border: 1px solid var(--nc-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.nc-text-sucesso {
+  color: var(--nc-success);
+}
+
+.nc-text-falha {
+  color: var(--nc-danger);
+}
+
+.nc-barra {
+  height: 10px;
+  border-radius: var(--nc-radius-pill);
+  background: var(--nc-bg-elevated);
+  border: 1px solid var(--nc-border);
+  overflow: hidden;
+}
+
+.nc-barra-preenchimento {
+  height: 100%;
+  border-radius: var(--nc-radius-pill);
+  background: var(--nc-success-gradient);
+  transition: width 0.6s ease;
+}

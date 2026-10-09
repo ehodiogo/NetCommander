@@ -1,0 +1,48 @@
+{% comment %}Desempenho das últimas execuções (agregado de ResultadoMaquina).{% endcomment %}
+<section class="card border-0 shadow-sm rounded-4 overflow-hidden mb-5" aria-labelledby="titulo-desempenho">
+    <div class="card-header bg-dark py-3">
+        <h5 class="card-title mb-0 text-white" id="titulo-desempenho"><i class="bi bi-bar-chart-fill text-success me-2" aria-hidden="true"></i>Desempenho das Execuções</h5>
+        <p class="mb-0 small text-white-50">Últimas {{ estatisticas.total_execucoes }} execuções · {{ estatisticas.total_resultados }} máquinas alcançadas</p>
+    </div>
+    <div class="card-body p-4" aria-live="polite">
+        {% if estatisticas.total_resultados %}
+        <div class="row g-4 align-items-center">
+            <div class="col-md-4 text-center">
+                <div class="nc-donut mx-auto" role="img" aria-label="Taxa de sucesso de {{ estatisticas.taxa_sucesso }} por cento" style="--nc-donut-valor: {{ estatisticas.taxa_sucesso }}%;">
+                    <div class="nc-donut-centro">
+                        <span class="fs-3 fw-bold text-body">{{ estatisticas.taxa_sucesso }}%</span>
+                        <span class="d-block small text-muted">sucesso</span>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-center gap-3 mt-3 small">
+                    <span><i class="bi bi-circle-fill nc-text-sucesso me-1" aria-hidden="true"></i>{{ estatisticas.sucessos }} êxitos</span>
+                    <span><i class="bi bi-circle-fill nc-text-falha me-1" aria-hidden="true"></i>{{ estatisticas.falhas }} falhas</span>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    {% if estatisticas.melhor_sala %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2"><i class="bi bi-trophy me-1" aria-hidden="true"></i>Melhor: {{ estatisticas.melhor_sala.sala_nome }} ({{ estatisticas.melhor_sala.taxa_sucesso }}%)</span>
+                    {% endif %}
+                    {% if estatisticas.pior_sala %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Maior falha: {{ estatisticas.pior_sala.sala_nome }} ({{ estatisticas.pior_sala.taxa_falha }}%)</span>
+                    {% endif %}
+                </div>
+                {% for sala in estatisticas.por_sala %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-bold text-body">{{ sala.sala_nome }}</span>
+                        <span class="text-muted">{{ sala.sucessos }}/{{ sala.total }} · {{ sala.taxa_sucesso }}%</span>
+                    </div>
+                    <div class="nc-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ sala.taxa_sucesso }}" aria-label="Taxa de sucesso em {{ sala.sala_nome }}">
+                        <div class="nc-barra-preenchimento" data-largura="{{ sala.taxa_sucesso }}" style="width: {{ sala.taxa_sucesso }}%;"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+            {% include 'components/empty_state.html' with icone='bi-bar-chart' texto='Sem dados de execução para exibir ainda.' %}
+        {% endif %}
+    </div>
+</section>

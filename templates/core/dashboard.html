@@ -38,10 +38,14 @@
         {% endfor %}
     </div>
 
+    {% include 'core/dashboard/estatisticas.html' %}
+
     {% include 'core/dashboard/historico.html' %}
 </div>
+{{ estatisticas|json_script:"dados-estatisticas" }}
 {% endblock %}
 
 {% block scripts %}
+<script type="module" src="{% static 'js/dashboard-grafico.js' %}"></script>
 <script type="module" src="{% static 'js/historico.js' %}"></script>
 {% endblock %}
