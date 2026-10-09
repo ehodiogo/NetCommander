@@ -111,7 +111,7 @@ def remover_maquina(request, sala_id, maquina_id):
     maquina = get_object_or_404(Maquina, id=maquina_id)
 
     if request.method == 'POST':
-        sala.maquinas.remove(maquina)
+        maquina.delete()
         return redirect('sala_detail', sala_id=sala.id)
 
     return redirect('sala_detail', sala_id=sala.id)
