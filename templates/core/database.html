@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4 pb-5">
+    {% include 'components/page_header.html' with titulo='ncc@db' destaque='Database' subtitulo='Backup e download do banco de dados SQLite.' %}
+
+    <div class="row g-4 mb-5">
+        <div class="col-12 col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold text-body">Banco de dados atual</h5>
+                    <p class="text-muted small">SQLite — gestão remota de computadores em redes locais.</p>
+                    <table class="table table-sm table-dark border-0">
+                        <tbody>
+                            <tr>
+                                <th scope="row" class="text-muted small">Caminho</th>
+                                <td><code class="text-body">{{ caminho_banco }}</code></td>
+                            </tr>
+                            <tr>
+                                <th scope="row" class="text-muted small">Tamanho</th>
+                                <td>{{ tamanho_banco|filesizeformat }}</td>
+                            </tr>
+                            <tr>
+                                <th scope="row" class="text-muted small">Última modificação</th>
+                                <td>{{ modificacao_banco|date:"d/m/Y H:i:s" }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body p-4 d-flex flex-column">
+                    <h5 class="card-title fw-bold text-body">Download do banco</h5>
+                    <p class="text-muted small flex-grow-1">Baixe uma cópia do arquivo <code>db.sqlite3</code> no estado atual. Útil para backups e migrações.</p>
+                    <a href="{{ download_url }}" class="btn btn-warning fw-bold rounded-pill">
+                        <i class="bi bi-download me-1" aria-hidden="true"></i> Baixar banco de dados
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

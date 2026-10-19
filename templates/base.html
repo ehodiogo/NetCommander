@@ -54,6 +54,11 @@
                             <i class="bi bi-building me-1" aria-hidden="true"></i> Salas
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link px-3 {% if request.resolver_match.url_name == 'database' %}active{% endif %}" href="{% url 'database' %}">
+                            <i class="bi bi-database me-1" aria-hidden="true"></i> Database
+                        </a>
+                    </li>
                     <li class="nav-item ms-lg-3">
                         <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2">
                             <i class="bi bi-person-check me-1" aria-hidden="true"></i> {{ user.username }}

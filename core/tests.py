@@ -1,5 +1,8 @@
 import io
+import os
+import sqlite3
 import subprocess
+import tempfile
 from unittest import mock
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -675,3 +678,46 @@ class EstatisticasTests(TestCase):
         self.assertContains(resp, 'Desempenho das Execuções')
         self.assertContains(resp, 'id="dados-estatisticas"')
         self.assertContains(resp, 'Lab 1')
+
+
+class DatabaseTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        user = User.objects.create_user(username='admin', password='x')
+        self.client.force_login(user)
+        _, self.tmp_db = tempfile.mkstemp(suffix='.sqlite3')
+        conn = sqlite3.connect(self.tmp_db)
+        conn.execute('CREATE TABLE IF NOT EXISTS teste (id INTEGER)')
+        conn.commit()
+        conn.close()
+        self._patch = mock.patch(
+            'core.views.gerencia._caminho_banco', return_value=self.tmp_db
+        )
+        self._patch.start()
+
+    def tearDown(self):
+        self._patch.stop()
+        try:
+            os.unlink(self.tmp_db)
+        except OSError:
+            pass
+
+    def test_database_200(self):
+        resp = self.client.get(reverse('database'))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_database_mostra_infos_e_download(self):
+        resp = self.client.get(reverse('database'))
+        self.assertContains(resp, 'Database')
+        self.assertContains(resp, 'Baixar banco de dados')
+        self.assertContains(resp, reverse('download_database'))
+        self.assertContains(resp, self.tmp_db)
+
+    def test_download_database_retorna_arquivo(self):
+        resp = self.client.get(reverse('download_database'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp['Content-Type'], 'application/x-sqlite3')
+        self.assertIn('attachment', resp['Content-Disposition'])
+        self.assertIn('netcommander.db.sqlite3', resp['Content-Disposition'])
+        conteudo = b''.join(resp.streaming_content)
+        self.assertTrue(len(conteudo) > 0)
