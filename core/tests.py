@@ -721,3 +721,106 @@ class DatabaseTests(TestCase):
         self.assertIn('netcommander.db.sqlite3', resp['Content-Disposition'])
         conteudo = b''.join(resp.streaming_content)
         self.assertTrue(len(conteudo) > 0)
+
+
+class MonitorTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        user = User.objects.create_user(username='admin', password='x')
+        self.client.force_login(user)
+        self.sala = Sala.objects.create(nome='Lab 1')
+        self.maquina = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55', tipo_os='debian',
+            ultimo_ip='10.0.0.9',
+        )
+        self.sala.maquinas.add(self.maquina)
+
+    def test_pagina_monitor_requer_login(self):
+        self.client.logout()
+        resp = self.client.get(reverse('monitor'))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_pagina_monitor_200(self):
+        resp = self.client.get(reverse('monitor'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Lab 1')
+
+    def test_api_monitor_requer_post(self):
+        resp = self.client.get(reverse('monitor_status'))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_api_monitor_sem_sala_retorna_400(self):
+        resp = self.client.post(reverse('monitor_status'), {})
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()['ok'])
+
+    def test_api_monitor_sala_inexistente_retorna_404(self):
+        resp = self.client.post(reverse('monitor_status'), {'sala': 9999})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_retorna_online_e_offline_com_resumo(self):
+        sem_ip = Maquina.objects.create(
+            nome='PC2', mac_address='00:11:22:33:44:66', tipo_os='windows'
+        )
+        self.sala.maquinas.add(sem_ip)
+
+        with mock.patch('core.monitor.scan_arp', return_value={}), \
+             mock.patch('core.monitor.maquina_esta_online', return_value=(True, 64)):
+            resp = self.client.post(
+                reverse('monitor_status'), {'sala': self.sala.id}
+            )
+
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        self.assertTrue(payload['ok'])
+        dados = payload['dados']
+        self.assertEqual(dados['sala'], 'Lab 1')
+        self.assertEqual(dados['total'], 2)
+        self.assertEqual(dados['online'], 1)
+        self.assertEqual(dados['offline'], 1)
+
+        pc1 = next(r for r in dados['resultados'] if r['maquina'] == 'PC1')
+        self.assertTrue(pc1['online'])
+        self.assertEqual(pc1['ip'], '10.0.0.9')
+        self.assertEqual(pc1['motivo'], '')
+
+        pc2 = next(r for r in dados['resultados'] if r['maquina'] == 'PC2')
+        self.assertFalse(pc2['online'])
+        self.assertIn('Sem IP', pc2['motivo'])
+
+    def test_maquina_sem_ip_nao_é_verificada_na_rede(self):
+        self.maquina.ultimo_ip = None
+        self.maquina.save()
+
+        with mock.patch('core.monitor.scan_arp', return_value={}), \
+             mock.patch('core.monitor.maquina_esta_online') as mock_online:
+            resp = self.client.post(
+                reverse('monitor_status'), {'sala': self.sala.id}
+            )
+
+        mock_online.assert_not_called()
+        resultado = resp.json()['dados']['resultados'][0]
+        self.assertFalse(resultado['online'])
+        self.assertEqual(resultado['ip'], '')
+
+    def test_usa_ip_do_arp_cache_quando_nao_há_ultimo_ip(self):
+        self.maquina.ultimo_ip = None
+        self.maquina.save()
+        arp = {'00:11:22:33:44:55': '10.0.0.77'}
+
+        with mock.patch('core.monitor.scan_arp', return_value=arp), \
+             mock.patch('core.monitor.maquina_esta_online', return_value=(True, 64)) as mock_online:
+            resp = self.client.post(
+                reverse('monitor_status'), {'sala': self.sala.id}
+            )
+
+        resultado = resp.json()['dados']['resultados'][0]
+        self.assertEqual(resultado['ip'], '10.0.0.77')
+        mock_online.assert_called_once_with('10.0.0.77', self.maquina.porta_ssh)
+
+    def test_sala_sem_maquinas_retorna_lista_vazia(self):
+        vazia = Sala.objects.create(nome='Lab vazio')
+        resp = self.client.post(reverse('monitor_status'), {'sala': vazia.id})
+        dados = resp.json()['dados']
+        self.assertEqual(dados['total'], 0)
+        self.assertEqual(dados['resultados'], [])

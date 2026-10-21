@@ -25,3 +25,4 @@ from core.views.gerencia import (
     remover_maquina,
     sala_detail,
 )
+from core.views.monitor import monitor, monitor_status

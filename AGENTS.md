@@ -191,6 +191,7 @@ Todas as views permanecem no app `core`, organizadas em pacote por domínio:
 * `core/views/auth.py` — autenticação (`login_view`, `logout_view`).
 * `core/views/dashboard.py` — landing/resumo (`dashboard`).
 * `core/views/execucao.py` — área de execução (`execucao`, `terminal`), execução, terminal e cancelamento.
+* `core/views/monitor.py` — monitor de status das máquinas (`monitor`, `monitor_status`); a lógica de verificação fica em `core/monitor.py`.
 * `core/views/gerencia.py` — CRUD de salas, máquinas e comandos (`biblioteca`, `lista_salas`, `criar_*`, `editar_*`, `deletar_*`, `sala_detail`).
 * `core/views/utils.py` — helpers compartilhados (`_resposta_bloqueio`, `_salas_para_json`, etc.).
 
@@ -203,6 +204,7 @@ O sistema é dividido em 3 áreas de navegação + dashboard:
 * **Dashboard** (`home`, `/`) — landing/resumo com contagens (salas, máquinas, scripts, execuções), gráfico de desempenho das últimas execuções, atalhos para as áreas e histórico recente.
 * **Biblioteca** (`biblioteca`, `/biblioteca/`) — listagem de scripts salvos, criar/editar/excluir (`/comandos/novo/`, `/comando/editar/<id>/`, `/comando/deletar/<id>/`).
 * **Execução** (`execucao`, `/execucao/`) — console de disparo de scripts prontos + histórico; o Terminal (`/terminal/`) fica subordinado a esta área.
+* **Monitor** (`monitor`, `/monitor/`) — filtro por sala com verificação rápida (ping + porta SSH, em paralelo) de quais máquinas estão online/offline.
 * **Salas** (`lista_salas`, `/salas/`) — listagem de salas, criar sala e CRUD de máquinas (`/salas/...`, `/maquinas/nova/`).
 
 ## Templates

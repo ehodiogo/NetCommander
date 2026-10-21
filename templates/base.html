@@ -50,6 +50,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link px-3 {% if request.resolver_match.url_name == 'monitor' %}active{% endif %}" href="{% url 'monitor' %}">
+                            <i class="bi bi-activity me-1" aria-hidden="true"></i> Monitor
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link px-3 {% if request.resolver_match.url_name == 'lista_salas' or request.resolver_match.url_name == 'sala_detail' or request.resolver_match.url_name == 'criar_sala' %}active{% endif %}" href="{% url 'lista_salas' %}">
                             <i class="bi bi-building me-1" aria-hidden="true"></i> Salas
                         </a>

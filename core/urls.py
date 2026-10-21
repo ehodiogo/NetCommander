@@ -25,6 +25,7 @@ from .views.gerencia import (
     remover_maquina,
     sala_detail,
 )
+from .views.monitor import monitor, monitor_status
 
 urlpatterns = [
     path("login/", login_view, name="login"),
@@ -51,4 +52,6 @@ urlpatterns = [
     path('comando/deletar/<int:comando_id>/', deletar_comando, name='deletar_comando'),
     path('terminal/', terminal, name='terminal'),
     path('api/terminal/executar/', terminal_executar, name='terminal_executar'),
+    path('monitor/', monitor, name='monitor'),
+    path('api/monitor/status/', monitor_status, name='monitor_status'),
 ]
