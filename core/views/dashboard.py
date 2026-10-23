@@ -70,6 +70,7 @@ def dashboard(request):
     ]
 
     return render(request, "core/dashboard.html", {
+        "titulo": "NCC | Dashboard",
         "resumo": resumo,
         "areas": areas,
         "execucoes": execucoes,

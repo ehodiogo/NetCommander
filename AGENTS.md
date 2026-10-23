@@ -232,6 +232,19 @@ Toda execução pode ser cancelada de forma cooperativa:
 
 ---
 
+# Limpeza do Histórico de Execuções
+
+O card "Últimos Disparos" (partial `templates/core/dashboard/historico.html`, usado no Dashboard e na página Execução) possui o botão "Apagar últimas execuções".
+
+Convenções:
+
+* Endpoint `limpar_execucoes` (POST `/api/execucoes/limpar/`) apaga apenas execuções **finalizadas** (`concluido`, `falha`, `cancelado`); execuções `pendente`/`em_andamento` nunca são removidas para não corromper execuções em andamento.
+* O `delete()` em cascata remove os `ResultadoMaquina` associados.
+* O botão é renderizado apenas quando há execuções no histórico (`{% if execucoes %}`) e sempre abre modal Bootstrap de confirmação (ação destrutiva); nunca usar `confirm()` nativo.
+* A lógica JS fica em `static/js/historico.js` (carregado no Dashboard e na página Execução); o clique usa `stopPropagation` para não alternar o colapso do card.
+
+---
+
 # Banco de Dados
 
 Nunca alterar tabelas manualmente.

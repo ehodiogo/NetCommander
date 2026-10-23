@@ -3,6 +3,7 @@ import os
 import sqlite3
 import subprocess
 import tempfile
+from datetime import datetime
 from unittest import mock
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -400,6 +401,96 @@ class PaginasRenderTests(TestCase):
         resp = self.client.get(reverse('sala_detail', args=[self.sala.id]))
         self.assertEqual(resp.status_code, 200)
 
+    def test_titulos_de_aba_sao_distintos(self):
+        casos = {
+            'home': 'NCC | Dashboard',
+            'biblioteca': 'NCC | Biblioteca de Scripts',
+            'execucao': 'NCC | Execução',
+            'terminal': 'NCC | Terminal',
+            'monitor': 'NCC | Monitor',
+            'lista_salas': 'NCC | Salas',
+        }
+        for url_name, titulo in casos.items():
+            with self.subTest(url_name=url_name):
+                resp = self.client.get(reverse(url_name))
+                self.assertContains(resp, f'<title>{titulo}</title>')
+
+
+class LimparExecucoesTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        user = User.objects.create_user(username='admin', password='x')
+        self.client.force_login(user)
+        self.sala = Sala.objects.create(nome='Lab 1')
+        self.maquina = Maquina.objects.create(
+            nome='PC1', mac_address='00:11:22:33:44:55', tipo_os='debian'
+        )
+
+    def _execucao(self, status='concluido'):
+        return Execucao.objects.create(
+            comando=None, sala=self.sala, status=status,
+            total_maquinas=1, comando_texto='hostname', os_alvo='debian'
+        )
+
+    def test_limpar_requer_post(self):
+        resp = self.client.get(reverse('limpar_execucoes'))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_limpar_requer_login(self):
+        self.client.logout()
+        resp = self.client.post(reverse('limpar_execucoes'))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_limpar_apaga_finalizadas_e_mantem_em_andamento(self):
+        finalizada = self._execucao(status='concluido')
+        falha = self._execucao(status='falha')
+        cancelada = self._execucao(status='cancelado')
+        em_andamento = self._execucao(status='em_andamento')
+        pendente = self._execucao(status='pendente')
+
+        resp = self.client.post(reverse('limpar_execucoes'))
+
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        self.assertTrue(payload['ok'])
+        self.assertEqual(payload['dados']['removidas'], 3)
+        restantes = set(Execucao.objects.values_list('id', flat=True))
+        self.assertEqual(restantes, {em_andamento.id, pendente.id})
+        self.assertFalse(
+            Execucao.objects.filter(
+                id__in=[finalizada.id, falha.id, cancelada.id]
+            ).exists()
+        )
+
+    def test_limpar_remove_resultados_cascata(self):
+        execucao = self._execucao(status='concluido')
+        ResultadoMaquina.objects.create(
+            execucao=execucao, maquina=self.maquina,
+            status='sucesso', progresso='concluido'
+        )
+
+        resp = self.client.post(reverse('limpar_execucoes'))
+
+        self.assertEqual(resp.json()['dados']['removidas'], 1)
+        self.assertEqual(ResultadoMaquina.objects.count(), 0)
+
+    def test_limpar_sem_historico_retorna_zero(self):
+        resp = self.client.post(reverse('limpar_execucoes'))
+        self.assertEqual(resp.json()['dados']['removidas'], 0)
+
+    def test_paginas_exibem_botao_e_modal_limpeza(self):
+        self._execucao(status='concluido')
+        for nome_url in ('home', 'execucao'):
+            resp = self.client.get(reverse(nome_url))
+            self.assertContains(resp, 'id="btnLimparHistorico"')
+            self.assertContains(resp, 'id="modalLimparHistorico"')
+            self.assertContains(resp, 'Apagar últimas execuções')
+
+    def test_botao_oculto_sem_historico(self):
+        resp = self.client.get(reverse('home'))
+        self.assertNotContains(resp, 'id="btnLimparHistorico"')
+        self.assertContains(resp, 'id="modalLimparHistorico"')
+
 
 class CancelarExecucaoTests(TestCase):
     def setUp(self):
@@ -712,6 +803,11 @@ class DatabaseTests(TestCase):
         self.assertContains(resp, 'Baixar banco de dados')
         self.assertContains(resp, reverse('download_database'))
         self.assertContains(resp, self.tmp_db)
+
+    def test_database_mostra_data_modificacao(self):
+        esperado = datetime.fromtimestamp(os.stat(self.tmp_db).st_mtime)
+        resp = self.client.get(reverse('database'))
+        self.assertContains(resp, esperado.strftime('%d/%m/%Y'))
 
     def test_download_database_retorna_arquivo(self):
         resp = self.client.get(reverse('download_database'))

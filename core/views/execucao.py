@@ -178,6 +178,21 @@ def cancelar_execucao(request, execucao_id):
     return JsonResponse({"ok": True})
 
 
+@login_required
+def limpar_execucoes(request):
+    if request.method != 'POST':
+        return JsonResponse({"ok": False, "erros": ["Método inválido."]}, status=405)
+
+    finalizadas = Execucao.objects.filter(
+        status__in=['concluido', 'falha', 'cancelado']
+    )
+    removidas = finalizadas.count()
+    finalizadas.delete()
+
+    logger.info("Histórico de execuções limpo: %s execução(ões) removida(s)", removidas)
+    return JsonResponse({"ok": True, "dados": {"removidas": removidas}})
+
+
 @ensure_csrf_cookie
 @login_required
 def execucao(request):
@@ -195,6 +210,7 @@ def execucao(request):
     ]
 
     return render(request, "core/execucao.html", {
+        "titulo": "NCC | Execução",
         "salas": salas,
         "comandos": comandos,
         "execucoes": execucoes,
@@ -210,7 +226,7 @@ def terminal(request):
     salas = Sala.objects.all()
     return render(
         request, "core/terminal.html",
-        {"salas": salas, "salas_json": _salas_para_json()},
+        {"titulo": "NCC | Terminal", "salas": salas, "salas_json": _salas_para_json()},
     )
 
 

@@ -13,6 +13,7 @@ from salas.models import Sala
 @login_required
 def monitor(request):
     return render(request, "core/monitor.html", {
+        "titulo": "NCC | Monitor",
         "salas": Sala.objects.all(),
         "criar_sala_url": reverse('criar_sala'),
     })

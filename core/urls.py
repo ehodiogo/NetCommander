@@ -8,6 +8,7 @@ from .views.execucao import (
     execucao_status,
     executar_maquina,
     executar_sala,
+    limpar_execucoes,
     terminal,
     terminal_executar,
 )
@@ -49,6 +50,7 @@ urlpatterns = [
     path('api/executar_maquina/<int:maquina_id>/<int:comando_id>/', executar_maquina, name='executar_maquina'),
     path('api/execucao/<int:execucao_id>/status/', execucao_status, name='execucao_status'),
     path('api/execucao/<int:execucao_id>/cancelar/', cancelar_execucao, name='cancelar_execucao'),
+    path('api/execucoes/limpar/', limpar_execucoes, name='limpar_execucoes'),
     path('comando/deletar/<int:comando_id>/', deletar_comando, name='deletar_comando'),
     path('terminal/', terminal, name='terminal'),
     path('api/terminal/executar/', terminal_executar, name='terminal_executar'),

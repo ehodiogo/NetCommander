@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import tempfile
+from datetime import datetime
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -18,6 +19,7 @@ from salas.models import Sala
 def lista_salas(request):
     salas = Sala.objects.prefetch_related('maquinas').all()
     return render(request, "salas/lista_salas.html", {
+        "titulo": "NCC | Salas",
         "salas": salas,
         "criar_sala_url": reverse('criar_sala'),
     })
@@ -27,6 +29,7 @@ def lista_salas(request):
 def biblioteca(request):
     comandos = Comando.objects.all().order_by('nome')
     return render(request, "core/biblioteca.html", {
+        "titulo": "NCC | Biblioteca de Scripts",
         "comandos": comandos,
         "acao_criar_comando": reverse('criar_comando'),
     })
@@ -39,13 +42,19 @@ def criar_sala(request):
         sala = form.save()
         return redirect("sala_detail", sala_id=sala.id)
 
-    return render(request, "salas/criar_sala.html", {"form": form})
+    return render(request, "salas/criar_sala.html", {
+        "titulo": "NCC | Nova Sala",
+        "form": form,
+    })
 
 
 @login_required
 def sala_detail(request, sala_id):
     sala = get_object_or_404(Sala, id=sala_id)
-    return render(request, "salas/sala_detail.html", {"sala": sala})
+    return render(request, "salas/sala_detail.html", {
+        "titulo": f"NCC | Sala {sala.nome}",
+        "sala": sala,
+    })
 
 
 @login_required
@@ -64,7 +73,11 @@ def criar_maquina(request, sala_id=None):
 
         return redirect("lista_salas")
 
-    return render(request, "maquinas/criar_maquina.html", {"form": form, "sala": sala})
+    return render(request, "maquinas/criar_maquina.html", {
+        "titulo": "NCC | Nova Máquina",
+        "form": form,
+        "sala": sala,
+    })
 
 
 @login_required
@@ -73,7 +86,10 @@ def criar_comando(request):
     if form.is_valid():
         form.save()
         return redirect("biblioteca")
-    return render(request, "comandos/criar_comando.html", {"form": form})
+    return render(request, "comandos/criar_comando.html", {
+        "titulo": "NCC | Novo Script",
+        "form": form,
+    })
 
 
 @login_required
@@ -88,6 +104,7 @@ def editar_maquina(request, maquina_id, sala_id):
         return redirect("sala_detail", sala_id=sala.id)
 
     return render(request, "maquinas/criar_maquina.html", {
+        "titulo": f"NCC | Editar {maquina.nome}",
         "form": form,
         "sala": sala,
         "editando": True
@@ -105,6 +122,7 @@ def editar_comando(request, comando_id):
         return redirect('biblioteca')
 
     return render(request, 'core/editar_comando.html', {
+        "titulo": f"NCC | Editar {comando.nome}",
         'form': form,
         'comando': comando
     })
@@ -143,8 +161,9 @@ def database(request):
     if os.path.exists(caminho):
         stat = os.stat(caminho)
         tamanho = stat.st_size
-        modificacao = stat.st_mtime
+        modificacao = datetime.fromtimestamp(stat.st_mtime)
     return render(request, "core/database.html", {
+        "titulo": "NCC | Database",
         "caminho_banco": caminho,
         "tamanho_banco": tamanho,
         "modificacao_banco": modificacao,
