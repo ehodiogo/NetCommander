@@ -32,6 +32,14 @@ def biblioteca(request):
         "titulo": "NCC | Biblioteca de Scripts",
         "comandos": comandos,
         "acao_criar_comando": reverse('criar_comando'),
+        "acoes_header": [
+            {
+                'url': reverse('criar_comando'),
+                'label': 'Novo Script',
+                'icone': 'bi-plus-circle-fill',
+                'cor': 'btn-warning',
+            },
+        ],
     })
 
 
@@ -51,9 +59,19 @@ def criar_sala(request):
 @login_required
 def sala_detail(request, sala_id):
     sala = get_object_or_404(Sala, id=sala_id)
+    acoes_header = [
+        {
+            'url': reverse('criar_maquina_sala', args=[sala.id]),
+            'label': 'Nova Máquina',
+            'icone': 'bi-plus-circle-fill',
+            'cor': 'btn-success',
+        },
+    ]
     return render(request, "salas/sala_detail.html", {
         "titulo": f"NCC | Sala {sala.nome}",
         "sala": sala,
+        "subtitulo_header": f"{sala.maquinas.count()} máquinas vinculadas a este setor.",
+        "acoes_header": acoes_header,
     })
 
 
@@ -77,6 +95,11 @@ def criar_maquina(request, sala_id=None):
         "titulo": "NCC | Nova Máquina",
         "form": form,
         "sala": sala,
+        "destaque_header": "Nova Máquina",
+        "subtitulo_header": (
+            f"Cadastro na sala {sala.nome}." if sala
+            else "Cadastro avulso, sem vínculo com sala."
+        ),
     })
 
 
@@ -107,7 +130,9 @@ def editar_maquina(request, maquina_id, sala_id):
         "titulo": f"NCC | Editar {maquina.nome}",
         "form": form,
         "sala": sala,
-        "editando": True
+        "editando": True,
+        "destaque_header": maquina.nome,
+        "subtitulo_header": f"Edição dos dados na sala {sala.nome}.",
     })
 
 

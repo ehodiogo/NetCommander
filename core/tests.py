@@ -355,6 +355,23 @@ class PaginasRenderTests(TestCase):
         self.assertContains(resp, 'Atualizar')
         self.assertContains(resp, '/comandos/novo/')
 
+    def test_biblioteca_grade_tem_busca_e_badges(self):
+        Comando.objects.create(
+            nome='Desligar', comando_linux='', comando_windows='shutdown /s /t 0'
+        )
+        resp = self.client.get(reverse('biblioteca'))
+        self.assertContains(resp, 'id="buscaScript"')
+        self.assertContains(resp, 'data-script-card')
+        self.assertContains(resp, 'id="linhaSemResultadoScript"')
+        self.assertContains(resp, 'bg-success-subtle text-success-emphasis')
+        self.assertContains(resp, 'bg-primary-subtle text-primary-emphasis')
+
+    def test_biblioteca_vazia_mostra_empty_state_sem_busca(self):
+        Comando.objects.all().delete()
+        resp = self.client.get(reverse('biblioteca'))
+        self.assertContains(resp, 'Nenhum script cadastrado ainda.')
+        self.assertNotContains(resp, 'id="buscaScript"')
+
     def test_lista_salas_200(self):
         resp = self.client.get(reverse('lista_salas'))
         self.assertEqual(resp.status_code, 200)
@@ -401,6 +418,18 @@ class PaginasRenderTests(TestCase):
         resp = self.client.get(reverse('sala_detail', args=[self.sala.id]))
         self.assertEqual(resp.status_code, 200)
 
+    def test_sala_detail_tem_busca_por_nome(self):
+        resp = self.client.get(reverse('sala_detail', args=[self.sala.id]))
+        self.assertContains(resp, 'id="buscaMaquina"')
+        self.assertContains(resp, 'js/maquinas-filtro.js')
+        self.assertContains(resp, f'data-nome="{self.maquina.nome.lower()}"')
+
+    def test_sala_sem_maquinas_nao_mostra_busca(self):
+        sala_vazia = Sala.objects.create(nome='Sala Vazia')
+        resp = self.client.get(reverse('sala_detail', args=[sala_vazia.id]))
+        self.assertContains(resp, 'Inventário de Máquinas')
+        self.assertNotContains(resp, 'id="buscaMaquina"')
+
     def test_titulos_de_aba_sao_distintos(self):
         casos = {
             'home': 'NCC | Dashboard',
@@ -414,6 +443,41 @@ class PaginasRenderTests(TestCase):
             with self.subTest(url_name=url_name):
                 resp = self.client.get(reverse(url_name))
                 self.assertContains(resp, f'<title>{titulo}</title>')
+
+    def test_cabecalhos_padrao_ncc(self):
+        casos = [
+            ('home', [], 'ncc@ip', 'Control'),
+            ('biblioteca', [], 'ncc@lib', 'Biblioteca'),
+            ('execucao', [], 'ncc@exec', 'Execução'),
+            ('terminal', [], 'ncc@term', 'Terminal'),
+            ('monitor', [], 'ncc@mon', 'Monitor'),
+            ('lista_salas', [], 'ncc@lab', 'Salas'),
+            ('database', [], 'ncc@db', 'Database'),
+            ('criar_sala', [], 'ncc@lab', 'Nova Sala'),
+            ('criar_comando', [], 'ncc@lib', 'Novo Script'),
+            ('criar_maquina', [], 'ncc@lab', 'Nova Máquina'),
+            ('criar_maquina_sala', [self.sala.id], 'ncc@lab', 'Nova Máquina'),
+        ]
+        for url_name, args, handle, destaque in casos:
+            with self.subTest(url_name=url_name):
+                resp = self.client.get(reverse(url_name, args=args))
+                self.assertContains(resp, handle)
+                self.assertContains(
+                    resp, f'<span class="text-primary">{destaque}</span>'
+                )
+
+    def test_cabecalhos_dinamicos(self):
+        resp = self.client.get(reverse('sala_detail', args=[self.sala.id]))
+        self.assertContains(resp, '<span class="text-primary">Lab 1</span>')
+        self.assertContains(resp, 'máquinas vinculadas a este setor.')
+
+        resp = self.client.get(reverse('editar_comando', args=[self.comando.id]))
+        self.assertContains(resp, '<span class="text-primary">Atualizar</span>')
+
+        resp = self.client.get(
+            reverse('editar_maquina', args=[self.sala.id, self.maquina.id])
+        )
+        self.assertContains(resp, '<span class="text-primary">PC1</span>')
 
 
 class LimparExecucoesTests(TestCase):

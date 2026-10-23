@@ -167,6 +167,10 @@ code {
   max-width: 400px;
 }
 
+.w-max-260 {
+  max-width: 260px;
+}
+
 /* ---- Terminal (janela, prompt, saída) -------------------------------------- */
 .terminal {
   background: var(--nc-bg-base);

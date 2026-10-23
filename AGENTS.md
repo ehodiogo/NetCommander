@@ -168,7 +168,7 @@ Estrutura de assets:
 
 * `static/css/tokens.css` — design tokens (cores, raio, espaçamento, fontes, sombras) via variáveis CSS `--nc-*`.
 * `static/css/app.css` — estilos globais e componentes; sempre usar os tokens, nunca valores hardcoded.
-* `static/js/*.js` — módulos ES (`<script type="module">`): `app.js` (utils: `fetchJSON`, `escapeHtml`, `showToast`, `lerDadosJSON`), `execucao-poller.js` (classe `ExecucaoPoller`), `execucao.js` (console de disparo), `biblioteca.js` (exclusão de scripts), `historico.js` (chevron de colapso), `terminal.js`, `forms.js`, `dashboard-grafico.js` (anima as barras do gráfico de desempenho).
+* `static/js/*.js` — módulos ES (`<script type="module">`): `app.js` (utils: `fetchJSON`, `escapeHtml`, `showToast`, `lerDadosJSON`), `execucao-poller.js` (classe `ExecucaoPoller`), `execucao.js` (console de disparo), `biblioteca.js` (exclusão de scripts), `historico.js` (chevron de colapso), `maquinas-filtro.js` (filtro por nome no inventário da sala), `terminal.js`, `forms.js`, `dashboard-grafico.js` (anima as barras do gráfico de desempenho).
 
 Convenções:
 
@@ -215,6 +215,7 @@ O sistema é dividido em 3 áreas de navegação + dashboard:
 * `templates/core/execucao.html` — área de execução (console + histórico).
 * `templates/core/dashboard/` — includes: `console.html` (disparo de scripts) e `historico.html` (últimos disparos), usados pelas páginas acima.
 * Páginas grandes devem ser compostas por includes; o template principal apenas orquestra.
+* Toda página de conteúdo usa o cabeçalho padrão via `components/page_header.html` no formato `titulo='ncc@<handle>'` + `destaque` + `subtitulo` (modelo: página Database). Handles: `ncc@ip` dashboard, `ncc@db` database, `ncc@lib` biblioteca/scripts, `ncc@exec` execução, `ncc@term` terminal, `ncc@mon` monitor, `ncc@lab` salas/máquinas. Não duplicar o título do cabeçalho dentro de headers de card.
 * Componentes com muitos parâmetros usam `{% include %}` com `with` em **linha única** — o lexer do Django não reconhece tags multilinha (sem flag DOTALL), que são renderizadas como texto literal.
 * **Nunca rodar `prettier --write` em `templates/`**: o parser HTML do prettier quebra tags Django (`{{ ... }}` viram `{{` + quebra de linha, renderizadas como texto literal) da mesma forma que tags multilinha. Manter toda tag `{{ }}`, `{% %}` em linha única e validar templates via `python manage.py test`, não via prettier.
 

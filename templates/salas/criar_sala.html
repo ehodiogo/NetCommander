@@ -4,15 +4,9 @@
 <div class="container mt-5">
     <div class="row justify-content-center">
         <div class="col-md-6">
+            {% include 'components/page_header.html' with titulo='ncc@lab' destaque='Nova Sala' subtitulo='Agrupe as máquinas de um laboratório para execuções em massa.' %}
             <div class="card shadow-lg border-0">
-                <div class="card-header bg-dark text-white py-3 text-center">
-                    <h4 class="mb-0"><i class="bi bi-door-open-fill me-2"></i>Nova Sala de TI</h4>
-                </div>
                 <div class="card-body p-4">
-                    <div class="text-center mb-4">
-                        <p class="text-muted">As salas permitem agrupar máquinas para execuções em massa via <strong>ncc@ip</strong>.</p>
-                    </div>
-
                     <form method="POST">
                         {% csrf_token %}
                         

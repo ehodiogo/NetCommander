@@ -10,22 +10,17 @@
                     {% if sala %}
                         <li class="breadcrumb-item"><a href="{% url 'sala_detail' sala.id %}">{{ sala.nome }}</a></li>
                     {% endif %}
-                    <li class="breadcrumb-item active" aria-current="page">Cadastro de Máquina</li>
+                    {% if editando %}
+                        <li class="breadcrumb-item active" aria-current="page">Edição de Máquina</li>
+                    {% else %}
+                        <li class="breadcrumb-item active" aria-current="page">Cadastro de Máquina</li>
+                    {% endif %}
                 </ol>
             </nav>
 
+            {% include 'components/page_header.html' with titulo='ncc@lab' destaque=destaque_header subtitulo=subtitulo_header %}
+
             <div class="card shadow border-0">
-                <div class="card-header bg-primary text-white py-3">
-                    <h4 class="mb-0">
-                        <i class="bi bi-pc-display-horizontal me-2"></i>
-                        {% if sala %}
-                            Nova Máquina para: <span class="fw-bold">{{ sala.nome }}</span>
-                        {% else %}
-                            Cadastrar Nova Máquina Avulsa
-                        {% endif %}
-                    </h4>
-                </div>
-                
                 <div class="card-body p-4">
                     <form method="POST" class="needs-validation">
                         {% csrf_token %}

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <div class="modal fade" id="modalRemoverMaquina" tabindex="-1" aria-hidden="true">
@@ -26,20 +27,21 @@
         </ol>
     </nav>
 
-    <div class="d-flex justify-content-between align-items-end mb-4">
-        <div>
-            <h2 class="fw-bold mb-0">Gerenciar Sala: <span class="text-primary">{{ sala.nome }}</span></h2>
-            <p class="text-muted mb-0">{{ sala.maquinas.count }} máquinas vinculadas a este setor.</p>
-        </div>
-        <a href="{% url 'criar_maquina_sala' sala.id %}" class="btn btn-success shadow-sm px-4">
-            <i class="bi bi-plus-circle-fill me-2" aria-hidden="true"></i>Nova Máquina
-        </a>
-    </div>
+    {% include 'components/page_header.html' with titulo='ncc@lab' destaque=sala.nome subtitulo=subtitulo_header acoes=acoes_header %}
 
     <div class="card shadow-sm border-0">
-        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Inventário de Máquinas</h5>
-            <span class="badge bg-primary">{{ sala.nome }}</span>
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-2">
+                <h5 class="mb-0">Inventário de Máquinas</h5>
+                <span class="badge bg-primary">{{ sala.nome }}</span>
+            </div>
+            {% if sala.maquinas.all %}
+            <div class="d-flex align-items-center gap-2">
+                <label for="buscaMaquina" class="visually-hidden">Filtrar máquinas pelo nome</label>
+                <input type="search" id="buscaMaquina" class="form-control form-control-sm w-max-260" placeholder="Filtrar por nome..." autocomplete="off" data-busca-maquina>
+                <span id="contadorMaquinas" class="badge bg-secondary text-body" aria-live="polite">{{ sala.maquinas.count }} máquinas</span>
+            </div>
+            {% endif %}
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -55,7 +57,7 @@
                     </thead>
                     <tbody>
                         {% for maquina in sala.maquinas.all %}
-                        <tr>
+                        <tr data-maquina-linha data-nome="{{ maquina.nome|lower }}">
                             <td class="ps-4">
                                 <div class="d-flex align-items-center">
                                     <div class="rounded-circle bg-dark-subtle p-2 me-3">
@@ -105,6 +107,12 @@
                             </td>
                         </tr>
                         {% endfor %}
+                        <tr id="linhaSemResultadoMaquina" hidden>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="bi bi-search fs-3 d-block mb-2" aria-hidden="true"></i>
+                                Nenhuma máquina encontrada para <strong id="termoSemResultado"></strong>.
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -132,3 +140,7 @@
     });
 </script>
 {% endblock %}
+
+{% block scripts %}
+    <script type="module" src="{% static 'js/maquinas-filtro.js' %}"></script>
+{% endblock scripts %}
