@@ -32,14 +32,6 @@ def biblioteca(request):
         "titulo": "NCC | Biblioteca de Scripts",
         "comandos": comandos,
         "acao_criar_comando": reverse('criar_comando'),
-        "acoes_header": [
-            {
-                'url': reverse('criar_comando'),
-                'label': 'Novo Script',
-                'icone': 'bi-plus-circle-fill',
-                'cor': 'btn-warning',
-            },
-        ],
     })
 
 

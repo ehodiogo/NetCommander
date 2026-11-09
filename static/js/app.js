@@ -19,7 +19,12 @@ export async function fetchJSON(url, options = {}) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
-  const res = await fetch(url, opts);
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch {
+    return { ok: false, status: 0, dados: null };
+  }
   let dados = null;
   try {
     dados = await res.json();

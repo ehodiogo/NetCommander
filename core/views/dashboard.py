@@ -45,34 +45,9 @@ def dashboard(request):
         },
     ]
 
-    areas = [
-        {
-            'titulo': 'Biblioteca de Scripts',
-            'icone': 'bi-code-slash',
-            'descricao': 'Crie, edite e gerencie os scripts salvos.',
-            'url': reverse('biblioteca'),
-            'cor': 'btn-warning',
-        },
-        {
-            'titulo': 'Execução',
-            'icone': 'bi-lightning-charge-fill',
-            'descricao': 'Dispare scripts prontos ou use o Terminal.',
-            'url': reverse('execucao'),
-            'cor': 'btn-success',
-        },
-        {
-            'titulo': 'Salas',
-            'icone': 'bi-building',
-            'descricao': 'Organize máquinas por salas e administre os laboratórios.',
-            'url': reverse('lista_salas'),
-            'cor': 'btn-primary',
-        },
-    ]
-
     return render(request, "core/dashboard.html", {
         "titulo": "NCC | Dashboard",
         "resumo": resumo,
-        "areas": areas,
         "execucoes": execucoes,
         "estatisticas": estatisticas_execucoes(LIMITE_PADRAO),
     })

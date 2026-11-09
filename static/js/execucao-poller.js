@@ -3,10 +3,12 @@
 import { fetchJSON, statusFinal } from './app.js';
 
 export class ExecucaoPoller {
-  constructor({ execucaoId, onDados, onFinal, intervalo = 1500 }) {
+  constructor({ execucaoId, onDados, onFinal, onErro, intervalo = 1500 }) {
     this.execucaoId = execucaoId;
     this.onDados = onDados;
     this.onFinal = onFinal;
+    this.onErro = onErro;
+    this.consultando = false;
     this.intervalo = intervalo;
     this.timer = null;
   }
@@ -18,8 +20,16 @@ export class ExecucaoPoller {
   }
 
   async buscar() {
+    if (this.timer === null || this.consultando) return;
+    const timer = this.timer;
+    this.consultando = true;
     const { ok, dados } = await fetchJSON(`/api/execucao/${this.execucaoId}/status/`);
-    if (!ok || !dados || !dados.ok) return;
+    this.consultando = false;
+    if (this.timer !== timer) return;
+    if (!ok || !dados?.ok || !dados.dados) {
+      this.onErro?.();
+      return;
+    }
     const payload = dados.dados;
     if (this.onDados) this.onDados(payload);
     if (statusFinal(payload.status)) {
@@ -29,7 +39,7 @@ export class ExecucaoPoller {
   }
 
   stop() {
-    if (this.timer) {
+    if (this.timer !== null) {
       window.clearInterval(this.timer);
       this.timer = null;
     }

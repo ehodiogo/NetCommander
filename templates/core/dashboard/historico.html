@@ -1,7 +1,8 @@
 {% comment %}Histórico de disparos (últimos 5).{% endcomment %}
-<div class="modal fade" id="modalLimparHistorico" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="modalLimparHistorico" tabindex="-1" aria-labelledby="titulo-limpar-historico" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title h5" id="titulo-limpar-historico">Apagar histórico</h2></div>
             <div class="modal-body py-4">
                 <p class="mb-0">Apagar todas as execuções finalizadas do histórico? Execuções em andamento serão mantidas. Essa ação não pode ser desfeita.</p>
             </div>
@@ -15,49 +16,42 @@
     </div>
 </div>
 
-<div class="mt-5">
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-        <div class="card-header bg-dark py-3 d-flex justify-content-between align-items-center cursor-pointer"
-            data-bs-toggle="collapse" data-bs-target="#historicoCollapse"
-            aria-expanded="false" aria-controls="historicoCollapse">
-            <h5 class="card-title mb-0 text-white">
-                <i class="bi bi-clock-history text-warning me-2" aria-hidden="true"></i>Últimos Disparos
-            </h5>
-            <div class="d-flex align-items-center gap-3">
-                {% if execucoes %}
-                <button type="button" class="btn btn-outline-danger btn-sm rounded-pill" id="btnLimparHistorico">
-                    <i class="bi bi-trash3 me-1" aria-hidden="true"></i>Apagar últimas execuções
+<div class="mb-4">
+    <section class="card border-0 shadow-sm rounded-4 overflow-hidden" aria-labelledby="titulo-historico">
+        <div class="card-header bg-dark py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h2 class="h5 mb-0" id="titulo-historico">
+                <button type="button" class="btn btn-dark text-start fw-semibold"
+                    data-bs-toggle="collapse" data-bs-target="#historicoCollapse"
+                    aria-expanded="{{ historico_aberto|yesno:'true,false' }}" aria-controls="historicoCollapse">
+                    <i class="bi bi-clock-history me-2" aria-hidden="true"></i>Últimos disparos
+                    <i class="bi bi-chevron-down ms-2 chevron-collapse{% if historico_aberto %} rotated{% endif %}" id="iconeHistorico" aria-hidden="true"></i>
                 </button>
-                {% endif %}
-                <i class="bi bi-chevron-down text-white chevron-collapse" id="iconeHistorico" aria-hidden="true"></i>
-            </div>
+            </h2>
+            {% if execucoes %}
+            <button type="button" class="btn btn-outline-danger btn-sm" id="btnLimparHistorico">
+                <i class="bi bi-trash me-1" aria-hidden="true"></i>Apagar histórico
+            </button>
+            {% endif %}
         </div>
 
-        <div class="collapse" id="historicoCollapse">
+        <div class="collapse{% if historico_aberto %} show{% endif %}" id="historicoCollapse">
             <div class="card-body p-0">
                 {% if execucoes %}
                     {% for ex in execucoes %}
                     <div class="border-bottom p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <div class="d-flex flex-wrap align-items-center gap-2 nc-wrap mw-100">
                                 <span class="fw-bold text-body">{% if ex.comando %}{{ ex.comando.nome }}{% else %}{{ ex.comando_texto|default:"Terminal" }}{% endif %}</span>
                                 <span class="text-muted small">
                                     {% if ex.sala %}
                                         <i class="bi bi-building me-1" aria-hidden="true"></i>{{ ex.sala.nome }}
                                     {% else %}
-                                        <i class="bi bi-pc-display me-1" aria-hidden="true"></i>Máquina avulsa
+                                        <i class="bi bi-pc-display me-1" aria-hidden="true"></i>{{ ex.resultados.all.0.maquina.nome|default:"Máquina avulsa" }}
                                     {% endif %}
                                 </span>
                             </div>
-                            <div class="d-flex align-items-center gap-3">
-                                {% with resultados=ex.resultados.all %}
-                                    {% for r in resultados %}
-                                        {% if r.status == 'sucesso' %}<span class="badge bg-success"><i class="bi bi-check-lg" aria-hidden="true"></i></span>
-                                        {% elif r.status == 'erro' %}<span class="badge bg-danger"><i class="bi bi-x-lg" aria-hidden="true"></i></span>
-                                        {% else %}<span class="badge bg-warning text-dark"><i class="bi bi-dash-lg" aria-hidden="true"></i></span>
-                                        {% endif %}
-                                    {% endfor %}
-                                {% endwith %}
+                            <div class="d-flex flex-wrap align-items-center gap-2 nc-wrap mw-100">
+                                {% include 'components/badge_status.html' with status=ex.status rotulo=ex.get_status_display %}
                                 <span class="text-muted small">
                                     <i class="bi bi-clock me-1" aria-hidden="true"></i>{{ ex.created_at|date:"d/m/Y H:i" }}
                                 </span>
@@ -69,10 +63,10 @@
                             {% if r.status == 'sucesso' %}border-success
                             {% elif r.status == 'erro' %}border-danger
                             {% else %}border-warning{% endif %}">
-                            <div class="d-flex align-items-center gap-2 cursor-pointer"
+                            <button type="button" class="btn btn-dark w-100 d-flex flex-wrap align-items-center gap-2 text-start nc-wrap"
                                 data-bs-toggle="collapse" data-bs-target="#outputResultado{{ r.id }}"
                                 aria-expanded="false" aria-controls="outputResultado{{ r.id }}">
-                                <span class="small fw-bold text-body w-min-120">
+                                <span class="small fw-bold text-body">
                                     {{ r.maquina.nome }}
                                 </span>
                                 {% if r.os_detectado %}
@@ -84,11 +78,11 @@
                                     </span>
                                 {% endif %}
                                 {% include 'components/badge_status.html' with status=r.status %}
-                                <code class="small text-muted text-truncate w-max-400">
+                                <code class="small text-muted text-truncate w-max-400 d-none d-md-block">
                                     {{ r.output|default:"Sem output." }}
                                 </code>
                                 <i class="bi bi-chevron-down text-muted chevron-collapse ms-auto" aria-hidden="true"></i>
-                            </div>
+                            </button>
                             <div class="collapse" id="outputResultado{{ r.id }}">
                                 <pre class="terminal-pre small-output mb-0">{{ r.output|default:"Sem output." }}</pre>
                             </div>
@@ -101,5 +95,5 @@
                 {% endif %}
             </div>
         </div>
-    </div>
+    </section>
 </div>

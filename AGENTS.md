@@ -201,7 +201,7 @@ O `core/urls.py` importa das subviews diretamente.
 
 O sistema é dividido em 3 áreas de navegação + dashboard:
 
-* **Dashboard** (`home`, `/`) — landing/resumo com contagens (salas, máquinas, scripts, execuções), gráfico de desempenho das últimas execuções, atalhos para as áreas e histórico recente.
+* **Dashboard** (`home`, `/`) — landing/resumo com contagens que servem de atalhos, gráfico de desempenho e histórico recente expandido, nessa ordem.
 * **Biblioteca** (`biblioteca`, `/biblioteca/`) — listagem de scripts salvos, criar/editar/excluir (`/comandos/novo/`, `/comando/editar/<id>/`, `/comando/deletar/<id>/`).
 * **Execução** (`execucao`, `/execucao/`) — console de disparo de scripts prontos + histórico; o Terminal (`/terminal/`) fica subordinado a esta área.
 * **Monitor** (`monitor`, `/monitor/`) — filtro por sala com verificação rápida (ping + porta SSH, em paralelo) de quais máquinas estão online/offline.
@@ -215,9 +215,17 @@ O sistema é dividido em 3 áreas de navegação + dashboard:
 * `templates/core/execucao.html` — área de execução (console + histórico).
 * `templates/core/dashboard/` — includes: `console.html` (disparo de scripts) e `historico.html` (últimos disparos), usados pelas páginas acima.
 * Páginas grandes devem ser compostas por includes; o template principal apenas orquestra.
-* Toda página de conteúdo usa o cabeçalho padrão via `components/page_header.html` no formato `titulo='ncc@<handle>'` + `destaque` + `subtitulo` (modelo: página Database). Handles: `ncc@ip` dashboard, `ncc@db` database, `ncc@lib` biblioteca/scripts, `ncc@exec` execução, `ncc@term` terminal, `ncc@mon` monitor, `ncc@lab` salas/máquinas. Não duplicar o título do cabeçalho dentro de headers de card.
+* Toda página de conteúdo usa o cabeçalho padrão via `components/page_header.html` com `titulo='ncc@<handle>'` como identificador em monoespaçada, `destaque` como título principal (`h1`) e `subtitulo` como descrição. Handles: `ncc@ip` dashboard, `ncc@db` database, `ncc@lib` biblioteca/scripts, `ncc@exec` execução, `ncc@term` terminal, `ncc@mon` monitor, `ncc@lab` salas/máquinas. Não duplicar o título do cabeçalho dentro de headers de card.
 * Componentes com muitos parâmetros usam `{% include %}` com `with` em **linha única** — o lexer do Django não reconhece tags multilinha (sem flag DOTALL), que são renderizadas como texto literal.
 * **Nunca rodar `prettier --write` em `templates/`**: o parser HTML do prettier quebra tags Django (`{{ ... }}` viram `{{` + quebra de linha, renderizadas como texto literal) da mesma forma que tags multilinha. Manter toda tag `{{ }}`, `{% %}` em linha única e validar templates via `python manage.py test`, não via prettier.
+
+---
+
+# Feedback operacional
+
+* Execução e Terminal compartilham seletores nativos de alvo e sistema operacional e o modal de revisão. A quantidade exibida no modal vem do inventário carregado na página e representa os alvos da sala antes da verificação de disponibilidade.
+* Falhas ao disparar aparecem no painel de resultados. Falhas ao consultar o status preservam o último progresso e permitem repetir somente a consulta GET pelo `ExecucaoPoller`.
+* O Monitor mantém o resultado anterior com a sala e o horário da verificação durante uma atualização. Se ela falhar, um aviso persistente identifica os dados exibidos como resultado da consulta anterior.
 
 ---
 
@@ -235,14 +243,14 @@ Toda execução pode ser cancelada de forma cooperativa:
 
 # Limpeza do Histórico de Execuções
 
-O card "Últimos Disparos" (partial `templates/core/dashboard/historico.html`, usado no Dashboard e na página Execução) possui o botão "Apagar últimas execuções".
+O histórico (partial `templates/core/dashboard/historico.html`) abre expandido no Dashboard e recolhido na página Execução. Os botões de expansão e de apagar histórico são independentes.
 
 Convenções:
 
 * Endpoint `limpar_execucoes` (POST `/api/execucoes/limpar/`) apaga apenas execuções **finalizadas** (`concluido`, `falha`, `cancelado`); execuções `pendente`/`em_andamento` nunca são removidas para não corromper execuções em andamento.
 * O `delete()` em cascata remove os `ResultadoMaquina` associados.
 * O botão é renderizado apenas quando há execuções no histórico (`{% if execucoes %}`) e sempre abre modal Bootstrap de confirmação (ação destrutiva); nunca usar `confirm()` nativo.
-* A lógica JS fica em `static/js/historico.js` (carregado no Dashboard e na página Execução); o clique usa `stopPropagation` para não alternar o colapso do card.
+* A lógica JS fica em `static/js/historico.js` (carregado no Dashboard e na página Execução); os botões nativos delegam a expansão ao Bootstrap.
 
 ---
 

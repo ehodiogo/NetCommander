@@ -5,14 +5,18 @@ Uso:
     titulo='...' subtitulo='...' icone='bi-terminal-fill' destaque='...'
     acoes=[{'url': '...', 'label': '...', 'icone': '...', 'cor': 'btn-primary'}] %}
 {% endcomment %}
-<div class="d-flex justify-content-between align-items-end mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-4 nc-wrap">
     <div>
-        <h2 class="fw-bold mb-0">
+        {% if destaque %}<p class="nc-page-handle mb-1">{{ titulo }}</p>{% endif %}
+        <h1 class="h2 fw-bold mb-0">
             {% if icone %}<i class="bi {{ icone }} text-primary me-2" aria-hidden="true"></i>{% endif %}
-            {{ titulo }}{% if destaque %} <span class="text-primary">{{ destaque }}</span>{% endif %}
-        </h2>
+            {{ destaque|default:titulo }}
+        </h1>
         {% if subtitulo %}<p class="text-muted mb-0">{{ subtitulo }}</p>{% endif %}
     </div>
+    {% if criar_url %}
+        {% include 'components/botao_criar.html' with url=criar_url rotulo=criar_rotulo only %}
+    {% endif %}
     {% if acoes %}
     <div class="d-flex gap-2 align-items-center">
         {% for acao in acoes %}

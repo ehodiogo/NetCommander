@@ -3,7 +3,7 @@
 
 {% block content %}
 <div class="container mt-4 pb-5">
-    {% include 'components/page_header.html' with titulo='ncc@ip' destaque='Control' subtitulo='Visão geral da infraestrutura e acesso rápido às áreas.' %}
+    {% include 'components/page_header.html' with titulo='ncc@ip' destaque='Dashboard' subtitulo='Visão geral da infraestrutura e acesso rápido às áreas.' %}
 
     <div class="row g-4 mb-5">
         {% for item in resumo %}
@@ -23,24 +23,8 @@
         {% endfor %}
     </div>
 
-    <div class="row g-4 mb-5">
-        {% for area in areas %}
-        <div class="col-md-4">
-            <div class="card h-100 border-0 shadow-sm card-hover overflow-hidden">
-                <div class="card-body d-flex flex-column p-4">
-                    <div class="fs-2 mb-3"><i class="bi {{ area.icone }}" aria-hidden="true"></i></div>
-                    <h5 class="card-title fw-bold text-body">{{ area.titulo }}</h5>
-                    <p class="text-muted small flex-grow-1">{{ area.descricao }}</p>
-                    <a href="{{ area.url }}" class="btn {{ area.cor }} fw-bold rounded-pill">Acessar</a>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
     {% include 'core/dashboard/estatisticas.html' %}
-
-    {% include 'core/dashboard/historico.html' %}
+    {% include 'core/dashboard/historico.html' with historico_aberto=True %}
 </div>
 {{ estatisticas|json_script:"dados-estatisticas" }}
 {% endblock %}

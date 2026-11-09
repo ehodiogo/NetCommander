@@ -14,9 +14,7 @@
 
     <div class="d-flex justify-content-between align-items-center mb-4">
         <span class="badge bg-secondary-subtle text-secondary px-3">{{ salas.count }} Salas</span>
-        <a href="{% url 'criar_sala' %}" class="btn btn-primary fw-bold px-4">
-            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Nova Sala
-        </a>
+        {% include 'components/botao_criar.html' with url=criar_sala_url rotulo='Nova Sala' only %}
     </div>
 
     {% if salas %}

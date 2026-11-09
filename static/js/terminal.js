@@ -1,12 +1,6 @@
 /* terminal.js — Terminal */
 
-import {
-  fetchJSON,
-  escapeHtml,
-  progressoTexto,
-  progressoCor,
-  lerDadosJSON,
-} from './app.js';
+import { fetchJSON, escapeHtml, progressoTexto, progressoCor, lerDadosJSON } from './app.js';
 import { ExecucaoPoller } from './execucao-poller.js';
 
 const salasMaquinas = lerDadosJSON('dados-salas') || [];
@@ -29,17 +23,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.querySelectorAll('[data-modo]').forEach((btn) => {
-  btn.addEventListener('click', () => setModo(btn.dataset.modo));
+  btn.addEventListener('change', () => setModo(btn.dataset.modo));
 });
 
 document.querySelectorAll('[data-os]').forEach((btn) => {
-  btn.addEventListener('click', () => setOSAlvo(btn.dataset.os));
+  btn.addEventListener('change', () => setOSAlvo(btn.dataset.os));
 });
 
 el('sala').addEventListener('change', atualizarMaquinasDaSala);
 el('btn-executar').addEventListener('click', () => prepararExecucao(el('comando-input').value));
 el('btnConfirmarExecucao').addEventListener('click', confirmarExecucao);
 el('btn-cancelar').addEventListener('click', cancelarExecucao);
+el('btn-atualizar-status').addEventListener('click', () => poller?.buscar());
 
 el('comando-input').addEventListener('keydown', (e) => {
   const input = el('comando-input');
@@ -67,8 +62,6 @@ el('comando-input').addEventListener('keydown', (e) => {
 
 function setModo(modo) {
   modoAtual = modo;
-  el('btn-modo-sala').classList.toggle('active', modo === 'sala');
-  el('btn-modo-maquina').classList.toggle('active', modo === 'maquina');
   el('maquina').classList.toggle('d-none', modo !== 'maquina');
   if (modo === 'maquina') atualizarMaquinasDaSala();
 }
@@ -91,7 +84,7 @@ function atualizarMaquinasDaSala() {
 function setOSAlvo(os) {
   osAlvoAtual = os;
   document.querySelectorAll('[data-os]').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.os === os);
+    btn.checked = btn.dataset.os === os;
   });
   el('prompt').textContent = os === 'debian' ? 'ncc@linux:~$' : 'C:\\>ncc';
 }
@@ -124,6 +117,7 @@ function atualizarStatus(texto) {
 }
 
 function prepararExecucao(comando) {
+  if (el('btn-executar').disabled) return;
   const comandoLimpo = (comando || '').trim();
   if (!comandoLimpo) return;
 
@@ -144,11 +138,24 @@ function prepararExecucao(comando) {
     alvoLabel = el('maquina').selectedOptions[0].textContent;
   }
 
+  const total =
+    modoAtual === 'sala'
+      ? salasMaquinas.find((sala) => String(sala.id) === el('sala').value).maquinas.length
+      : 1;
   el('conf-alvo').textContent = alvoLabel;
+  el('conf-total').textContent = total === 1 ? '1 máquina' : `${total} máquinas`;
+  el('btnConfirmarExecucao').textContent = `Executar em ${el('conf-total').textContent}`;
+  el('btnConfirmarExecucao').disabled = total === 0;
   el('conf-os').textContent = osAlvoAtual === 'debian' ? 'Linux' : 'Windows';
   el('conf-comando').textContent = comandoLimpo;
-  execucaoPendente = comandoLimpo;
-  modalConfirmarExecucao.show();
+  const body = new URLSearchParams({
+    os_alvo: osAlvoAtual,
+    comando_texto: comandoLimpo,
+    modo: modoAtual,
+    [modoAtual]: el(modoAtual).value,
+  });
+  execucaoPendente = { comando: comandoLimpo, body };
+  modalConfirmarExecucao.show(document.activeElement);
 }
 
 function confirmarExecucao() {
@@ -156,23 +163,17 @@ function confirmarExecucao() {
   if (execucaoPendente) disparar(execucaoPendente);
 }
 
-async function disparar(comando) {
+async function disparar({ comando, body }) {
+  const botao = el('btn-executar');
+  if (botao.disabled) return;
+  botao.disabled = true;
+  const erroDisparo = el('erro-disparo');
+  erroDisparo.classList.add('d-none');
+  el('status-indisponivel').classList.add('d-none');
+  el('btn-cancelar').classList.add('d-none');
   const input = el('comando-input');
 
-  const body = new URLSearchParams();
-  body.set('os_alvo', osAlvoAtual);
-  body.set('comando_texto', comando);
-  body.set('modo', modoAtual);
-
-  if (modoAtual === 'sala') {
-    body.set('sala', el('sala').value);
-  } else {
-    body.set('maquina', el('maquina').value);
-  }
-
   escreverLinha(`${el('prompt').textContent} ${comando}`);
-  input.value = '';
-
   if (historicoComandos[historicoComandos.length - 1] !== comando) {
     historicoComandos.push(comando);
   }
@@ -181,21 +182,27 @@ async function disparar(comando) {
   el('area-resultados').classList.remove('d-none');
   el('progresso-label').textContent = '0 / 0';
   el('barra-progresso').style.width = '0%';
-  el('barra-progresso').setAttribute('aria-valuenow', '0');
-  atualizarStatus('executando');
+  el('progresso-execucao').setAttribute('aria-valuenow', '0');
+  el('progresso-execucao').removeAttribute('aria-valuetext');
+  atualizarStatus('iniciando…');
+  el('resultados-lista').replaceChildren();
 
   if (poller) poller.stop();
 
   const { ok, dados } = await fetchJSON('/api/terminal/executar/', { method: 'POST', body });
 
-  if (!ok) {
+  botao.disabled = false;
+  if (!ok || !dados?.ok || !dados.dados?.execucao_id) {
     atualizarStatus('pronto');
-    el('btn-cancelar').classList.add('d-none');
-    const mensagem = dados?.erros?.[0] || 'Erro ao iniciar execução.';
-    escreverLinha(`Erro: ${mensagem}`, 'erro');
+    erroDisparo.textContent =
+      dados?.erros?.[0] ||
+      'Não foi possível confirmar o disparo. Consulte o histórico antes de tentar novamente.';
+    erroDisparo.classList.remove('d-none');
     return;
   }
 
+  atualizarStatus('executando');
+  if (input.value.trim() === comando) input.value = '';
   iniciarPolling(dados.dados.execucao_id);
 }
 
@@ -203,6 +210,7 @@ function iniciarPolling(execucaoId) {
   el('btn-cancelar').classList.remove('d-none');
   poller = new ExecucaoPoller({
     execucaoId,
+    onErro: () => el('status-indisponivel').classList.remove('d-none'),
     onDados: renderizarProgresso,
     onFinal: finalizarExecucao,
   });
@@ -210,13 +218,18 @@ function iniciarPolling(execucaoId) {
 }
 
 function renderizarProgresso(data) {
+  el('status-indisponivel').classList.add('d-none');
   const total = data.total_maquinas;
   const concluidas = data.concluidas;
   const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
 
   el('progresso-label').textContent = `${concluidas} / ${total}`;
   el('barra-progresso').style.width = `${pct}%`;
-  el('barra-progresso').setAttribute('aria-valuenow', pct);
+  el('progresso-execucao').setAttribute('aria-valuenow', pct);
+  el('progresso-execucao').setAttribute(
+    'aria-valuetext',
+    `${concluidas} de ${total} máquinas processadas`,
+  );
   renderizarResultados(data);
 }
 
@@ -251,14 +264,16 @@ function finalizarExecucao(data) {
     data.status === 'concluido'
       ? `Execução concluída (${data.concluidas}/${data.total_maquinas}).`
       : data.status === 'cancelado'
-      ? 'Execução cancelada pelo usuário.'
-      : 'Execução falhou.';
+        ? 'Execução cancelada pelo usuário.'
+        : 'Execução falhou.';
   escreverLinha(mensagem, data.status === 'concluido' ? 'ok' : 'erro');
 }
 
 async function cancelarExecucao() {
   if (!poller || !poller.execucaoId) return;
-  const { ok, dados } = await fetchJSON(`/api/execucao/${poller.execucaoId}/cancelar/`, { method: 'POST' });
+  const { ok, dados } = await fetchJSON(`/api/execucao/${poller.execucaoId}/cancelar/`, {
+    method: 'POST',
+  });
   if (!ok) {
     escreverLinha(`Erro ao cancelar: ${dados?.erros?.[0] || 'tente novamente.'}`, 'erro');
   }

@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.querySelectorAll('[data-modo]').forEach((btn) => {
-  btn.addEventListener('click', () => setModo(btn.dataset.modo));
+  btn.addEventListener('change', () => setModo(btn.dataset.modo));
 });
 
 el('sala').addEventListener('change', atualizarMaquinasDaSala);
@@ -52,18 +52,17 @@ el('comando').addEventListener('change', () => {
   atualizarPreviewComando();
 });
 
-document.querySelectorAll('#os-selector .btn').forEach((btn) => {
-  btn.addEventListener('click', () => setOSAlvo(btn.dataset.os));
+document.querySelectorAll('[data-os]').forEach((btn) => {
+  btn.addEventListener('change', () => setOSAlvo(btn.dataset.os));
 });
 
 el('btn-executar').addEventListener('click', prepararExecucao);
 el('btnConfirmarExecucao').addEventListener('click', confirmarExecucao);
 el('btn-cancelar').addEventListener('click', cancelarExecucao);
+el('btn-atualizar-status').addEventListener('click', () => poller?.buscar());
 
 function setModo(modo) {
   modoAtual = modo;
-  el('btn-modo-sala').classList.toggle('active', modo === 'sala');
-  el('btn-modo-maquina').classList.toggle('active', modo === 'maquina');
   el('maquina').classList.toggle('d-none', modo !== 'maquina');
   if (modo === 'maquina') atualizarMaquinasDaSala();
 }
@@ -98,8 +97,8 @@ function atualizarSeletorOS() {
 
 function setOSAlvo(os) {
   osAlvoAtual = os;
-  document.querySelectorAll('#os-selector .btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.os === os);
+  document.querySelectorAll('[data-os]').forEach((btn) => {
+    btn.checked = btn.dataset.os === os;
   });
 }
 
@@ -154,15 +153,21 @@ function prepararExecucao() {
 
   if (osAlvoAtual) url += `?os_alvo=${osAlvoAtual}`;
 
+  const total =
+    modoAtual === 'sala'
+      ? salasMaquinas.find((sala) => String(sala.id) === el('sala').value).maquinas.length
+      : 1;
   el('conf-alvo').textContent = alvoLabel;
+  el('conf-total').textContent = total === 1 ? '1 máquina' : `${total} máquinas`;
+  el('btnConfirmarExecucao').textContent = `Executar em ${el('conf-total').textContent}`;
+  el('btnConfirmarExecucao').disabled = total === 0;
   el('conf-comando').textContent = comandoExecutavel(comandosInfo[comandoId]);
-  el('conf-os').textContent = osAlvoAtual
-    ? osAlvoAtual === 'debian'
+  el('conf-os').textContent =
+    (osAlvoAtual ?? (comandosInfo[comandoId].has_linux ? 'debian' : 'windows')) === 'debian'
       ? 'Linux'
-      : 'Windows'
-    : 'Automático';
+      : 'Windows';
   execucaoUrl = url;
-  modalConfirmarExecucao.show();
+  modalConfirmarExecucao.show(document.activeElement);
 }
 
 function confirmarExecucao() {
@@ -171,32 +176,39 @@ function confirmarExecucao() {
 }
 
 async function disparar(url) {
+  const botao = el('btn-executar');
+  if (botao.disabled) return;
+  botao.disabled = true;
+  const erroDisparo = el('erro-disparo');
+  erroDisparo.classList.add('d-none');
+  el('status-indisponivel').classList.add('d-none');
+  el('btn-cancelar').classList.add('d-none');
   const areaResultados = el('area-resultados');
   const tabelaBody = document.querySelector('#tabela tbody');
 
   areaResultados.classList.remove('d-none');
   el('progresso-label').textContent = '0 / 0';
   el('barra-progresso').style.width = '0%';
-  el('barra-progresso').setAttribute('aria-valuenow', '0');
-  tabelaBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-grow text-primary" aria-hidden="true"></div><p class="mt-2 text-muted">Iniciando execução...</p></td></tr>`;
+  el('progresso-execucao').setAttribute('aria-valuenow', '0');
+  el('progresso-execucao').removeAttribute('aria-valuetext');
+  tabelaBody.innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-grow text-primary" aria-hidden="true"></div><p class="mt-2 text-muted">Iniciando execução…</p></td></tr>`;
 
   if (poller) poller.stop();
 
-  const { ok, dados, status } = await fetchJSON(url, { method: 'POST' });
+  const { ok, dados } = await fetchJSON(url, { method: 'POST' });
 
-  if (!ok) {
-    el('btn-cancelar').classList.add('d-none');
-    const mensagem = dados?.erros?.[0] || `Erro ao iniciar execução (HTTP ${status}).`;
-    showToast(mensagem, 'error');
-    if (dados?.execucao_bloqueante_id) {
-      showToast(
-        `Execução #${dados.execucao_bloqueante_id} em andamento há ${dados.idade}.`,
-        'warning',
-      );
-    }
+  botao.disabled = false;
+  if (!ok || !dados?.ok || !dados.dados?.execucao_id) {
+    tabelaBody.replaceChildren();
+    erroDisparo.textContent = dados?.execucao_bloqueante_id
+      ? `Execução #${dados.execucao_bloqueante_id} em andamento há ${dados.idade}.`
+      : dados?.erros?.[0] ||
+        'Não foi possível confirmar o disparo. Consulte o histórico antes de tentar novamente.';
+    erroDisparo.classList.remove('d-none');
     return;
   }
 
+  tabelaBody.replaceChildren();
   iniciarPolling(dados.dados.execucao_id);
 }
 
@@ -204,6 +216,7 @@ function iniciarPolling(execucaoId) {
   el('btn-cancelar').classList.remove('d-none');
   poller = new ExecucaoPoller({
     execucaoId,
+    onErro: () => el('status-indisponivel').classList.remove('d-none'),
     onDados: renderizarStatus,
     onFinal: finalizarPolling,
   });
@@ -211,13 +224,18 @@ function iniciarPolling(execucaoId) {
 }
 
 function renderizarStatus(data) {
+  el('status-indisponivel').classList.add('d-none');
   const total = data.total_maquinas;
   const concluidas = data.concluidas;
   const pct = total > 0 ? Math.round((concluidas / total) * 100) : 0;
 
   el('progresso-label').textContent = `${concluidas} / ${total}`;
   el('barra-progresso').style.width = `${pct}%`;
-  el('barra-progresso').setAttribute('aria-valuenow', pct);
+  el('progresso-execucao').setAttribute('aria-valuenow', pct);
+  el('progresso-execucao').setAttribute(
+    'aria-valuetext',
+    `${concluidas} de ${total} máquinas processadas`,
+  );
 
   const tabelaBody = document.querySelector('#tabela tbody');
   tabelaBody.replaceChildren();

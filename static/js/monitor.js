@@ -16,8 +16,9 @@ if (form)
 function estadoBotao(carregando) {
   const btn = el('btn-verificar');
   btn.disabled = carregando;
+  el('sala').disabled = carregando;
   btn.innerHTML = carregando
-    ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Verificando...'
+    ? '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Verificando…'
     : '<i class="bi bi-activity me-2" aria-hidden="true"></i>Verificar';
 }
 
@@ -30,8 +31,8 @@ async function verificar() {
   if (verificando) return;
   verificando = true;
   estadoBotao(true);
-  el('monitor-resumo').classList.add('d-none');
-  el('monitor-resultado').replaceChildren();
+  const aviso = el('monitor-aviso');
+  aviso.classList.add('d-none');
 
   const body = new URLSearchParams();
   body.set('sala', salaId);
@@ -41,8 +42,13 @@ async function verificar() {
   verificando = false;
   estadoBotao(false);
 
-  if (!ok) {
-    showToast(dados?.erros?.[0] || 'Erro ao verificar o status da sala.', 'error');
+  if (!ok || !dados?.ok || !dados.dados) {
+    const mensagem = dados?.erros?.[0] || 'Não foi possível verificar a sala. Tente novamente.';
+    const anterior = el('monitor-resultado').hasChildNodes();
+    aviso.textContent = anterior
+      ? `${mensagem} Exibindo o resultado da consulta anterior.`
+      : mensagem;
+    aviso.classList.remove('d-none');
     return;
   }
   renderizar(dados.dados);
@@ -58,11 +64,12 @@ function renderizarResumo(dados) {
   resumo.classList.remove('d-none');
   resumo.replaceChildren();
 
+  const horario = new Date();
   const cartao = document.createElement('div');
   cartao.className = 'card shadow-sm border-0';
   cartao.innerHTML = `
     <div class="card-body d-flex align-items-center gap-3 flex-wrap py-3">
-      <strong class="text-body">${escapeHtml(dados.sala)}</strong>
+      <strong class="text-body nc-wrap">${escapeHtml(dados.sala)}</strong>
       <span class="badge status-badge bg-success-subtle text-success-emphasis border border-success-subtle">
         <i class="bi bi-wifi me-1" aria-hidden="true"></i>${dados.online} online
       </span>
@@ -70,12 +77,14 @@ function renderizarResumo(dados) {
         <i class="bi bi-wifi-off me-1" aria-hidden="true"></i>${dados.offline} offline
       </span>
       <span class="badge status-badge bg-dark">${dados.total} no total</span>
+      <span class="small text-muted">Verificado em <time datetime="${horario.toISOString()}">${horario.toLocaleString('pt-BR')}</time></span>
     </div>`;
   resumo.appendChild(cartao);
 }
 
 function renderizarTabela(resultados) {
   const area = el('monitor-resultado');
+  area.replaceChildren();
 
   if (resultados.length === 0) {
     const vazio = document.createElement('div');
@@ -89,7 +98,10 @@ function renderizarTabela(resultados) {
   }
 
   const card = document.createElement('div');
-  card.className = 'card shadow-sm border-0';
+  card.className = 'card shadow-sm border-0 table-responsive';
+  card.tabIndex = 0;
+  card.setAttribute('role', 'region');
+  card.setAttribute('aria-label', 'Status das máquinas');
 
   const tabela = document.createElement('table');
   tabela.className = 'table table-hover align-middle mb-0';
@@ -110,11 +122,13 @@ function criarLinha(r) {
 
   const tdNome = document.createElement('td');
   tdNome.className = 'ps-4 fw-bold';
+  tdNome.classList.add('nc-wrap');
   tdNome.textContent = r.maquina;
 
   const tdIp = document.createElement('td');
   const codigo = document.createElement('code');
   codigo.className = 'user-select-all text-body-emphasis';
+  codigo.classList.add('nc-wrap');
   codigo.textContent = r.ip || '—';
   tdIp.appendChild(codigo);
 

@@ -32,16 +32,15 @@ const btnConfirmaLimpar = document.getElementById('btnConfirmaLimparHistorico');
 if (btnLimparHistorico && modalLimparHistorico && btnConfirmaLimpar) {
   const modal = new bootstrap.Modal(modalLimparHistorico);
 
-  btnLimparHistorico.addEventListener('click', (evento) => {
-    evento.stopPropagation();
+  btnLimparHistorico.addEventListener('click', () => {
     modal.show();
   });
 
   btnConfirmaLimpar.addEventListener('click', async () => {
     const { ok, dados } = await fetchJSON('/api/execucoes/limpar/', { method: 'POST' });
-    if (ok) {
+    if (ok && dados?.ok) {
       modal.hide();
-      showToast(`${dados.removidas} execução(ões) apagada(s) do histórico.`, 'success');
+      showToast(`${dados.dados.removidas} execução(ões) apagada(s) do histórico.`, 'success');
       setTimeout(() => window.location.reload(), 400);
     } else {
       showToast(dados?.erros?.[0] || 'Erro ao apagar o histórico.', 'error');

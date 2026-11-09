@@ -314,11 +314,13 @@ class PaginasRenderTests(TestCase):
         self.assertContains(resp, 'Scripts')
         self.assertContains(resp, 'Execuções')
 
-    def test_dashboard_landing_mostra_areas(self):
+    def test_dashboard_landing_mostra_desempenho_antes_do_historico_aberto(self):
         resp = self.client.get(reverse('home'))
-        self.assertContains(resp, '/biblioteca/')
-        self.assertContains(resp, '/execucao/')
-        self.assertContains(resp, '/salas/')
+        self.assertContains(resp, 'class="collapse show" id="historicoCollapse"')
+        self.assertLess(
+            resp.content.index(b'id="titulo-desempenho"'),
+            resp.content.index(b'id="historicoCollapse"'),
+        )
 
     def test_execucao_200(self):
         resp = self.client.get(reverse('execucao'))
@@ -329,10 +331,10 @@ class PaginasRenderTests(TestCase):
         self.assertContains(resp, 'id="dados-salas"')
         self.assertContains(resp, 'id="dados-comandos"')
 
-    def test_execucao_botoes_modo_tem_ids(self):
+    def test_execucao_usa_radios_para_modo(self):
         resp = self.client.get(reverse('execucao'))
-        self.assertContains(resp, 'id="btn-modo-sala"')
-        self.assertContains(resp, 'id="btn-modo-maquina"')
+        self.assertContains(resp, 'type="radio" class="btn-check" id="modo-sala" name="modo-execucao"')
+        self.assertContains(resp, 'type="radio" class="btn-check" id="modo-maquina" name="modo-execucao"')
 
     def test_execucao_contem_link_terminal(self):
         resp = self.client.get(reverse('execucao'))
@@ -353,7 +355,12 @@ class PaginasRenderTests(TestCase):
         resp = self.client.get(reverse('biblioteca'))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'Atualizar')
-        self.assertContains(resp, '/comandos/novo/')
+        self.assertContains(
+            resp,
+            f'<a href="{reverse("criar_comando")}" class="btn btn-primary fw-bold px-4">'
+            '<i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Novo Script</a>',
+            html=True,
+        )
 
     def test_biblioteca_grade_tem_busca_e_badges(self):
         Comando.objects.create(
@@ -389,10 +396,10 @@ class PaginasRenderTests(TestCase):
         self.assertContains(resp, 'id="modalConfirmarExecucao"')
         self.assertContains(resp, 'id="conf-comando"')
 
-    def test_terminal_botoes_modo_tem_ids(self):
+    def test_terminal_usa_radios_para_modo(self):
         resp = self.client.get(reverse('terminal'))
-        self.assertContains(resp, 'id="btn-modo-sala"')
-        self.assertContains(resp, 'id="btn-modo-maquina"')
+        self.assertContains(resp, 'type="radio" class="btn-check" id="modo-sala" name="modo-execucao"')
+        self.assertContains(resp, 'type="radio" class="btn-check" id="modo-maquina" name="modo-execucao"')
 
     def test_criar_sala_200(self):
         resp = self.client.get(reverse('criar_sala'))
@@ -446,7 +453,7 @@ class PaginasRenderTests(TestCase):
 
     def test_cabecalhos_padrao_ncc(self):
         casos = [
-            ('home', [], 'ncc@ip', 'Control'),
+            ('home', [], 'ncc@ip', 'Dashboard'),
             ('biblioteca', [], 'ncc@lib', 'Biblioteca'),
             ('execucao', [], 'ncc@exec', 'Execução'),
             ('terminal', [], 'ncc@term', 'Terminal'),
@@ -463,21 +470,21 @@ class PaginasRenderTests(TestCase):
                 resp = self.client.get(reverse(url_name, args=args))
                 self.assertContains(resp, handle)
                 self.assertContains(
-                    resp, f'<span class="text-primary">{destaque}</span>'
+                    resp, f'<h1 class="h2 fw-bold mb-0">{destaque}</h1>', html=True
                 )
 
     def test_cabecalhos_dinamicos(self):
         resp = self.client.get(reverse('sala_detail', args=[self.sala.id]))
-        self.assertContains(resp, '<span class="text-primary">Lab 1</span>')
+        self.assertContains(resp, '<h1 class="h2 fw-bold mb-0">Lab 1</h1>', html=True)
         self.assertContains(resp, 'máquinas vinculadas a este setor.')
 
         resp = self.client.get(reverse('editar_comando', args=[self.comando.id]))
-        self.assertContains(resp, '<span class="text-primary">Atualizar</span>')
+        self.assertContains(resp, '<h1 class="h2 fw-bold mb-0">Atualizar</h1>', html=True)
 
         resp = self.client.get(
             reverse('editar_maquina', args=[self.sala.id, self.maquina.id])
         )
-        self.assertContains(resp, '<span class="text-primary">PC1</span>')
+        self.assertContains(resp, '<h1 class="h2 fw-bold mb-0">PC1</h1>', html=True)
 
 
 class LimparExecucoesTests(TestCase):
@@ -548,7 +555,7 @@ class LimparExecucoesTests(TestCase):
             resp = self.client.get(reverse(nome_url))
             self.assertContains(resp, 'id="btnLimparHistorico"')
             self.assertContains(resp, 'id="modalLimparHistorico"')
-            self.assertContains(resp, 'Apagar últimas execuções')
+            self.assertContains(resp, 'Apagar histórico')
 
     def test_botao_oculto_sem_historico(self):
         resp = self.client.get(reverse('home'))

@@ -65,7 +65,6 @@ code {
   font-weight: 700;
   letter-spacing: -0.5px;
   background: var(--nc-primary-gradient);
-  -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
@@ -124,7 +123,7 @@ code {
 
 /* ---- Tabelas --------------------------------------------------------------- */
 .table-hover tbody tr:hover {
-  background-color: rgba(13, 110, 253, 0.15);
+  background-color: rgb(13 110 253 / 15%);
 }
 
 /* ---- Linha em processamento ------------------------------------------------ */
@@ -133,8 +132,9 @@ code {
   100% {
     background-color: transparent;
   }
+
   50% {
-    background-color: rgba(59, 130, 246, 0.05);
+    background-color: rgb(59 130 246 / 5%);
   }
 }
 
@@ -284,6 +284,7 @@ code {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -346,4 +347,28 @@ code {
   border-radius: var(--nc-radius-pill);
   background: var(--nc-success-gradient);
   transition: width 0.6s ease;
+}
+
+/* Cabeçalhos e conteúdo operacional */
+.nc-page-handle {
+  color: var(--nc-text-muted);
+  font-family: var(--nc-font-mono);
+}
+
+.nc-wrap {
+  overflow-wrap: anywhere;
+}
+
+.btn-check:focus-visible + .btn {
+  outline: 2px solid var(--nc-primary-bright);
+  outline-offset: -2px;
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--nc-primary);
+  --bs-btn-border-color: var(--nc-primary);
+}
+
+.nc-progress-count {
+  font-variant-numeric: tabular-nums;
 }
